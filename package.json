@@ -2,6 +2,7 @@
   "name": "housemate",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "packageManager": "yarn@4.16.0",
   "scripts": {
     "dev": "next dev",
