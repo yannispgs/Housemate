@@ -1,0 +1,108 @@
+@import "tailwindcss";
+
+/*
+ * Jetons de conception — brief de design § 4.2.
+ *
+ * Les valeurs sombres sont déclarées sous DEUX portées : la requête média
+ * couvre le réglage du système, la portée `data-theme` couvre la bascule
+ * manuelle, qui doit gagner dans les deux sens.
+ *
+ * Le mode sombre est CHOISI, pas inversé : chaque valeur est sélectionnée pour
+ * sa surface et validée séparément.
+ */
+
+@theme inline {
+  --color-surface: var(--surface);
+  --color-page: var(--page);
+  --color-ink: var(--ink-primary);
+  --color-ink-secondary: var(--ink-secondary);
+  --color-ink-muted: var(--ink-muted);
+  --color-grid: var(--grid);
+  --color-baseline: var(--baseline);
+  --color-border: var(--border);
+  --color-brand: var(--brand);
+  --color-period-action: var(--period-action);
+  --color-period-observation: var(--period-observation);
+  --color-status-good: var(--status-good);
+  --color-status-warning: var(--status-warning);
+  --color-status-serious: var(--status-serious);
+  --color-status-critical: var(--status-critical);
+}
+
+:root {
+  color-scheme: light;
+
+  --surface: #fcfcfb;
+  --page: #f9f9f7;
+  --ink-primary: #0b0b0b;
+  --ink-secondary: #52514e;
+  --ink-muted: #898781;
+  --grid: #e1e0d9;
+  --baseline: #c3c2b7;
+  --border: rgb(11 11 11 / 0.1);
+
+  /* Marque — chrome uniquement, jamais sur une donnée. Brief § 4.4. */
+  --brand: #eda100;
+
+  /* Frise — les deux seuls rôles chromatiques. Brief § 4.3. */
+  --period-action: #008300;
+  --period-observation: #2a78d6;
+
+  /* Statuts — réservés, toujours accompagnés d'une icône et d'un libellé. */
+  --status-good: #0ca30c;
+  --status-warning: #fab219;
+  --status-serious: #ec835a;
+  --status-critical: #d03b3b;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    color-scheme: dark;
+
+    --surface: #1a1a19;
+    --page: #0d0d0d;
+    --ink-primary: #ffffff;
+    --ink-secondary: #c3c2b7;
+    --ink-muted: #898781;
+    --grid: #2c2c2a;
+    --baseline: #383835;
+    --border: rgb(255 255 255 / 0.1);
+
+    --brand: #c98500;
+
+    --period-action: #008300;
+    --period-observation: #3987e5;
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --surface: #1a1a19;
+  --page: #0d0d0d;
+  --ink-primary: #ffffff;
+  --ink-secondary: #c3c2b7;
+  --ink-muted: #898781;
+  --grid: #2c2c2a;
+  --baseline: #383835;
+  --border: rgb(255 255 255 / 0.1);
+
+  --brand: #c98500;
+
+  --period-action: #008300;
+  --period-observation: #3987e5;
+}
+
+body {
+  background: var(--page);
+  color: var(--ink-primary);
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+/* Cibles tactiles d'au moins 44 px — l'usage principal est un iPhone. */
+@media (pointer: coarse) {
+  a,
+  button {
+    min-height: 44px;
+  }
+}
