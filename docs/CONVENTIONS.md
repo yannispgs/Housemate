@@ -118,11 +118,13 @@ otherwise. **Updated on every remark from the project owner.**
 - Work on feature branches; the default branch is `main`.
 - **Always ship through a Pull Request.** Never push/merge straight to `main`.
   The owner reviews and merges every PR himself (review + ownership).
-- ⚠️ **HouseMate — no GitHub remote yet.** Until it exists, work still happens on
-  one branch per change, committed but **never merged into `main`**. Only the
-  initial commit lives on `main`. When the remote is created, branches are
-  pushed and their PRs opened in order; dependent work stacks on the branch
-  below it rather than on `main`.
+- ⚠️ **HouseMate — the spec and scaffolding phase did not go through PRs, and
+  that is settled.** Nine branches had accumulated as bookmarks along a single
+  linear chain: nothing diverged, nothing merged, so each contained all the
+  previous ones. Opening them would have meant nine stacked reviews of one
+  straight line. The owner decided instead to fold the base configuration into
+  the initial commit and land the rest on `master` directly. **PRs start from
+  the implementation work onward**, where review actually helps.
 - **PR description** must recap the change from the **user's point of view**,
   grouped by view (see the review below); no test/validation section.
 - **CI/CD flag (first line) + `configuration` label.** When a PR touches
