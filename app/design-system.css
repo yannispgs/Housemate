@@ -90,11 +90,7 @@
   --period-action: #008300; /* 3,40:1 sur le fond */
   --period-observation: #2a78d6; /* 3,04:1 — tient, sans marge */
 
-  /* Statuts — jamais reconnaissables à la teinte seule : toujours accompagnés
-     d'une icône ET d'un libellé. Trois des quatre sont sous 3:1, ce qui rend
-     cette règle obligatoire et non plus recommandée (brief § 4.5). */
-  --status-good: #0ca30c; /* 2,31:1 */
-  --status-warning: #fab219; /* 1,26:1 */
-  --status-serious: #ec835a; /* 1,81:1 */
-  --status-critical: #d03b3b; /* 3,30:1 */
+  /* Les couleurs de statut sont des RÔLES et vivent dans globals.css
+     (--ink-critical, --ink-serious, --ink-warning, --ink-good), parce
+     qu'elles changent entre clair et sombre. */
 }

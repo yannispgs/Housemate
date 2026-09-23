@@ -9,13 +9,14 @@
  * alias sont donc le contrat entre le design et le code, et leurs noms sont
  * imposés par les maquettes — ne pas les renommer.
  *
- * ⚠️ PROVENANCE INÉGALE DES DEUX MODES.
- * Le mode SOMBRE est repris tel quel de `valsTheme()` dans `Ecran.dc.html` :
- * il est explicite dans la maquette, donc fidèle.
- * Le mode CLAIR ne l'est pas — il est le défaut du runtime de prévisualisation
- * et n'apparaît dans aucun fichier du projet. Il est donc RECONSTITUÉ en
- * miroir du sombre, et reste à vérifier visuellement contre la maquette
- * rendue. `--grid` et `--baseline` sont les deux plus incertains.
+ * SOURCE : `design_handoff_housemate/README.md`, section « Rôles sémantiques
+ * de l'application ». Les deux jeux de valeurs y sont donnés explicitement.
+ *
+ * ⚠️ Le handoff contredit `valsTheme()` dans `Ecran.dc.html` sur trois
+ * valeurs SOMBRES : `--ink-primary` (neutral-300 contre neutral-100),
+ * `--ink-secondary` (400 contre 300) et `--ink-muted` (500 contre 400). Le
+ * handoff fait foi — c'est le document désigné pour la reproduction — mais
+ * l'écart est à signaler côté design, l'un des deux ayant tort.
  *
  * Le mode sombre est CHOISI, pas inversé, et n'est pas encore livré : le
  * CLAUDE.md du projet de design dit « prévu plus tard, ne pas décrire comme
@@ -37,10 +38,11 @@
   --color-brand-ink: var(--brand-ink);
   --color-period-action: var(--period-action);
   --color-period-observation: var(--period-observation);
-  --color-status-good: var(--status-good);
-  --color-status-warning: var(--status-warning);
-  --color-status-serious: var(--status-serious);
-  --color-status-critical: var(--status-critical);
+  --color-ink-critical: var(--ink-critical);
+  --color-ink-serious: var(--ink-serious);
+  --color-ink-warning: var(--ink-warning);
+  --color-ink-good: var(--ink-good);
+  --color-critical-tint: var(--critical-tint);
 }
 
 :root {
@@ -49,32 +51,43 @@
   --page: var(--color-bg);
   --surface: var(--color-surface);
   --ink-primary: var(--color-text);
-  --ink-secondary: var(--color-neutral-700);
-  --ink-muted: var(--color-neutral-600);
-  --grid: var(--color-neutral-300);
-  --baseline: var(--color-neutral-400);
+  --ink-secondary: var(--color-neutral-800);
+  --ink-muted: var(--color-neutral-700);
+  --grid: var(--color-neutral-400);
+  --baseline: var(--color-neutral-500);
   --border: var(--color-divider);
 
   --brand: var(--color-accent);
   --brand-strong: var(--color-accent-700);
-  --brand-border: var(--color-accent);
+  --brand-border: var(--color-accent-300);
   --brand-ink: var(--color-accent-700);
-  --critical-tint: color-mix(in srgb, #d03b3b 12%, var(--color-bg));
+
+  --ink-critical: #d03b3b;
+  --ink-serious: #ec835a;
+  --ink-warning: #fab219;
+  --ink-good: #0ca30c;
+  --critical-tint: color-mix(in srgb, #d03b3b 14%, var(--page));
 }
 
 /*
- * Repris mot pour mot de l'objet DARK de `valsTheme()`. La bascule manuelle
- * doit gagner dans les deux sens, d'où les deux portées.
+ * Mode sombre — valeurs du handoff. La bascule manuelle doit gagner dans les
+ * deux sens, d'où les deux portées.
+ *
+ * Le lissage de police est exigé par le handoff : sans lui, macOS épaissit le
+ * texte clair sur fond sombre.
  */
 @media (prefers-color-scheme: dark) {
   :root:where(:not([data-theme="light"])) {
     color-scheme: dark;
 
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+
     --page: var(--color-neutral-900);
     --surface: var(--color-neutral-800);
-    --ink-primary: var(--color-neutral-100);
-    --ink-secondary: var(--color-neutral-300);
-    --ink-muted: var(--color-neutral-400);
+    --ink-primary: var(--color-neutral-300);
+    --ink-secondary: var(--color-neutral-400);
+    --ink-muted: var(--color-neutral-500);
     --grid: var(--color-neutral-700);
     --baseline: var(--color-neutral-500);
     --border: color-mix(in srgb, var(--color-neutral-100) 16%, transparent);
@@ -83,18 +96,26 @@
     --brand-strong: var(--color-accent-700);
     --brand-border: var(--color-accent-500);
     --brand-ink: var(--color-accent-300);
-    --critical-tint: color-mix(in srgb, #d03b3b 24%, var(--color-neutral-900));
+
+    --ink-critical: #f07a7a;
+    --ink-serious: #f2a07c;
+    --ink-warning: #f3c655;
+    --ink-good: #5fcf7a;
+    --critical-tint: color-mix(in srgb, #f07a7a 22%, #2a2b2e);
   }
 }
 
 :root[data-theme="dark"] {
   color-scheme: dark;
 
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
   --page: var(--color-neutral-900);
   --surface: var(--color-neutral-800);
-  --ink-primary: var(--color-neutral-100);
-  --ink-secondary: var(--color-neutral-300);
-  --ink-muted: var(--color-neutral-400);
+  --ink-primary: var(--color-neutral-300);
+  --ink-secondary: var(--color-neutral-400);
+  --ink-muted: var(--color-neutral-500);
   --grid: var(--color-neutral-700);
   --baseline: var(--color-neutral-500);
   --border: color-mix(in srgb, var(--color-neutral-100) 16%, transparent);
@@ -103,7 +124,12 @@
   --brand-strong: var(--color-accent-700);
   --brand-border: var(--color-accent-500);
   --brand-ink: var(--color-accent-300);
-  --critical-tint: color-mix(in srgb, #d03b3b 24%, var(--color-neutral-900));
+
+  --ink-critical: #f07a7a;
+  --ink-serious: #f2a07c;
+  --ink-warning: #f3c655;
+  --ink-good: #5fcf7a;
+  --critical-tint: color-mix(in srgb, #f07a7a 22%, #2a2b2e);
 }
 
 body {
