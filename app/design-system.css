@@ -1,0 +1,100 @@
+/*
+ * Organic — couche de jetons, importée du projet Claude Design.
+ *
+ * SOURCE DE VÉRITÉ : le design system `housemate-ds` dans Claude Design,
+ * fichier `_ds/housemate-ds-.../styles.css`. Ce fichier en est une copie.
+ * ⚠️ Ne pas retoucher une valeur ici : la modifier dans Claude Design, puis
+ * réimporter. Toute divergence se paiera au prochain import.
+ *
+ * Importé le 23/09/2026.
+ *
+ * Ce qui n'a PAS été repris : la couche de classes de composants du même
+ * fichier (`.btn`, `.card`, `.nav`, `.table`, `.dialog`). Elle vise du HTML
+ * simple sans build ; ici les composants sont du JSX, et les maquettes
+ * elles-mêmes ne s'en servent pas — elles stylent en ligne depuis les jetons.
+ */
+
+@import url("https://fonts.googleapis.com/css2?family=Caprasimo:wght@400&family=Figtree:wght@400;600;700&display=swap");
+
+:root {
+  --color-bg: #d5d6d8;
+  --color-surface: #e7e8e9;
+  --color-text: #201e1d;
+  --color-accent: #9d4925;
+  --color-accent-2: #7a8a5e;
+  --color-divider: color-mix(in srgb, #201e1d 16%, transparent);
+
+  /* Rampes tonales — générées en OKLCH sur une échelle de clarté partagée,
+     donc le même palier de deux rôles a le même poids visuel. */
+  --color-neutral-100: #f3f5f9;
+  --color-neutral-200: #e6e8ec;
+  --color-neutral-300: #d2d4d8;
+  --color-neutral-400: #b6b8bc;
+  --color-neutral-500: #96989c;
+  --color-neutral-600: #787a7e;
+  --color-neutral-700: #5c5d61;
+  --color-neutral-800: #404245;
+  --color-neutral-900: #2a2b2e;
+
+  --color-accent-100: #fef2ed;
+  --color-accent-200: #ffe1d5;
+  --color-accent-300: #fcc6b2;
+  --color-accent-400: #e7a68c;
+  --color-accent-500: #ce8264;
+  --color-accent-600: #b55f3b;
+  --color-accent-700: #94411c;
+  --color-accent-800: #722600;
+  --color-accent-900: #4f1600;
+
+  --color-accent-2-100: #f0fae1;
+  --color-accent-2-200: #e1eecc;
+  --color-accent-2-300: #ccdbb2;
+  --color-accent-2-400: #aebf92;
+  --color-accent-2-500: #8fa073;
+  --color-accent-2-600: #728157;
+  --color-accent-2-700: #56633f;
+  --color-accent-2-800: #3d472b;
+  --color-accent-2-900: #272e1b;
+
+  --font-heading: "Caprasimo", system-ui, sans-serif;
+  --font-heading-weight: 400;
+  --font-body: "Figtree", system-ui, sans-serif;
+
+  /* Densité 1,10× déjà appliquée — utiliser ces variables, pas des nombres. */
+  --space-1: 4.4px;
+  --space-2: 8.8px;
+  --space-3: 13.2px;
+  --space-4: 17.6px;
+  --space-6: 26.4px;
+  --space-8: 35.2px;
+
+  --radius-sm: 8px;
+  --radius-md: 16px;
+  --radius-lg: 28px;
+
+  --shadow-sm: 0 1px 2px color-mix(in srgb, #2a2b2e 14%, transparent);
+  --shadow-md: 0 3px 10px color-mix(in srgb, #2a2b2e 16%, transparent);
+  --shadow-lg: 0 12px 32px color-mix(in srgb, #2a2b2e 22%, transparent);
+}
+
+/*
+ * Jetons propres à HouseMate — ils ne viennent pas d'Organic et n'ont pas à
+ * y retourner. Déclarés à part pour rester visibles en tant qu'exception.
+ *
+ * ⚠️ Les contrastes ci-dessous ont été REMESURÉS sur le nouveau fond
+ * #d5d6d8 le 23/09/2026. Les valeurs du brief § 4 dataient du fond crème
+ * #f5ead8 et sont périmées.
+ */
+:root {
+  /* Frise — les deux seuls rôles chromatiques (brief § 4.3). */
+  --period-action: #008300; /* 3,40:1 sur le fond */
+  --period-observation: #2a78d6; /* 3,04:1 — tient, sans marge */
+
+  /* Statuts — jamais reconnaissables à la teinte seule : toujours accompagnés
+     d'une icône ET d'un libellé. Trois des quatre sont sous 3:1, ce qui rend
+     cette règle obligatoire et non plus recommandée (brief § 4.5). */
+  --status-good: #0ca30c; /* 2,31:1 */
+  --status-warning: #fab219; /* 1,26:1 */
+  --status-serious: #ec835a; /* 1,81:1 */
+  --status-critical: #d03b3b; /* 3,30:1 */
+}

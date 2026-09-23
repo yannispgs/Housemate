@@ -1,19 +1,30 @@
 @import "tailwindcss";
+@import "./design-system.css";
 
 /*
- * Jetons de conception — brief de design § 4.2.
+ * Couche sémantique — le pont entre les jetons d'Organic et les composants.
  *
- * Les valeurs sombres sont déclarées sous DEUX portées : la requête média
- * couvre le réglage du système, la portée `data-theme` couvre la bascule
- * manuelle, qui doit gagner dans les deux sens.
+ * Les maquettes Claude Design ne consomment JAMAIS `--color-*` directement :
+ * elles écrivent `var(--page)`, `var(--brand)`, `var(--ink-primary)`. Ces
+ * alias sont donc le contrat entre le design et le code, et leurs noms sont
+ * imposés par les maquettes — ne pas les renommer.
  *
- * Le mode sombre est CHOISI, pas inversé : chaque valeur est sélectionnée pour
- * sa surface et validée séparément.
+ * ⚠️ PROVENANCE INÉGALE DES DEUX MODES.
+ * Le mode SOMBRE est repris tel quel de `valsTheme()` dans `Ecran.dc.html` :
+ * il est explicite dans la maquette, donc fidèle.
+ * Le mode CLAIR ne l'est pas — il est le défaut du runtime de prévisualisation
+ * et n'apparaît dans aucun fichier du projet. Il est donc RECONSTITUÉ en
+ * miroir du sombre, et reste à vérifier visuellement contre la maquette
+ * rendue. `--grid` et `--baseline` sont les deux plus incertains.
+ *
+ * Le mode sombre est CHOISI, pas inversé, et n'est pas encore livré : le
+ * CLAUDE.md du projet de design dit « prévu plus tard, ne pas décrire comme
+ * exclu ». Les valeurs sont là, la bascule ne l'est pas.
  */
 
 @theme inline {
-  --color-surface: var(--surface);
   --color-page: var(--page);
+  --color-surface: var(--surface);
   --color-ink: var(--ink-primary);
   --color-ink-secondary: var(--ink-secondary);
   --color-ink-muted: var(--ink-muted);
@@ -21,6 +32,9 @@
   --color-baseline: var(--baseline);
   --color-border: var(--border);
   --color-brand: var(--brand);
+  --color-brand-strong: var(--brand-strong);
+  --color-brand-border: var(--brand-border);
+  --color-brand-ink: var(--brand-ink);
   --color-period-action: var(--period-action);
   --color-period-observation: var(--period-observation);
   --color-status-good: var(--status-good);
@@ -32,71 +46,100 @@
 :root {
   color-scheme: light;
 
-  --surface: #fcfcfb;
-  --page: #f9f9f7;
-  --ink-primary: #0b0b0b;
-  --ink-secondary: #52514e;
-  --ink-muted: #898781;
-  --grid: #e1e0d9;
-  --baseline: #c3c2b7;
-  --border: rgb(11 11 11 / 0.1);
+  --page: var(--color-bg);
+  --surface: var(--color-surface);
+  --ink-primary: var(--color-text);
+  --ink-secondary: var(--color-neutral-700);
+  --ink-muted: var(--color-neutral-600);
+  --grid: var(--color-neutral-300);
+  --baseline: var(--color-neutral-400);
+  --border: var(--color-divider);
 
-  /* Marque — chrome uniquement, jamais sur une donnée. Brief § 4.4. */
-  --brand: #eda100;
-
-  /* Frise — les deux seuls rôles chromatiques. Brief § 4.3. */
-  --period-action: #008300;
-  --period-observation: #2a78d6;
-
-  /* Statuts — réservés, toujours accompagnés d'une icône et d'un libellé. */
-  --status-good: #0ca30c;
-  --status-warning: #fab219;
-  --status-serious: #ec835a;
-  --status-critical: #d03b3b;
+  --brand: var(--color-accent);
+  --brand-strong: var(--color-accent-700);
+  --brand-border: var(--color-accent);
+  --brand-ink: var(--color-accent-700);
+  --critical-tint: color-mix(in srgb, #d03b3b 12%, var(--color-bg));
 }
 
+/*
+ * Repris mot pour mot de l'objet DARK de `valsTheme()`. La bascule manuelle
+ * doit gagner dans les deux sens, d'où les deux portées.
+ */
 @media (prefers-color-scheme: dark) {
   :root:where(:not([data-theme="light"])) {
     color-scheme: dark;
 
-    --surface: #1a1a19;
-    --page: #0d0d0d;
-    --ink-primary: #ffffff;
-    --ink-secondary: #c3c2b7;
-    --ink-muted: #898781;
-    --grid: #2c2c2a;
-    --baseline: #383835;
-    --border: rgb(255 255 255 / 0.1);
+    --page: var(--color-neutral-900);
+    --surface: var(--color-neutral-800);
+    --ink-primary: var(--color-neutral-100);
+    --ink-secondary: var(--color-neutral-300);
+    --ink-muted: var(--color-neutral-400);
+    --grid: var(--color-neutral-700);
+    --baseline: var(--color-neutral-500);
+    --border: color-mix(in srgb, var(--color-neutral-100) 16%, transparent);
 
-    --brand: #c98500;
-
-    --period-action: #008300;
-    --period-observation: #3987e5;
+    --brand: var(--color-accent-500);
+    --brand-strong: var(--color-accent-700);
+    --brand-border: var(--color-accent-500);
+    --brand-ink: var(--color-accent-300);
+    --critical-tint: color-mix(in srgb, #d03b3b 24%, var(--color-neutral-900));
   }
 }
 
 :root[data-theme="dark"] {
   color-scheme: dark;
 
-  --surface: #1a1a19;
-  --page: #0d0d0d;
-  --ink-primary: #ffffff;
-  --ink-secondary: #c3c2b7;
-  --ink-muted: #898781;
-  --grid: #2c2c2a;
-  --baseline: #383835;
-  --border: rgb(255 255 255 / 0.1);
+  --page: var(--color-neutral-900);
+  --surface: var(--color-neutral-800);
+  --ink-primary: var(--color-neutral-100);
+  --ink-secondary: var(--color-neutral-300);
+  --ink-muted: var(--color-neutral-400);
+  --grid: var(--color-neutral-700);
+  --baseline: var(--color-neutral-500);
+  --border: color-mix(in srgb, var(--color-neutral-100) 16%, transparent);
 
-  --brand: #c98500;
-
-  --period-action: #008300;
-  --period-observation: #3987e5;
+  --brand: var(--color-accent-500);
+  --brand-strong: var(--color-accent-700);
+  --brand-border: var(--color-accent-500);
+  --brand-ink: var(--color-accent-300);
+  --critical-tint: color-mix(in srgb, #d03b3b 24%, var(--color-neutral-900));
 }
 
 body {
+  margin: 0;
   background: var(--page);
   color: var(--ink-primary);
-  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-heading);
+  font-weight: var(--font-heading-weight);
+  line-height: 1.12;
+  letter-spacing: -0.015em;
+  margin: 0 0 var(--space-2);
+}
+
+/* États d'interaction thématisés — jamais les défauts du navigateur. */
+:focus {
+  outline: none;
+}
+
+:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--brand) 30%, transparent);
 }
 
 /* Cibles tactiles d'au moins 44 px — l'usage principal est un iPhone. */
