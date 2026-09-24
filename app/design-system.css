@@ -14,8 +14,6 @@
  * elles-mêmes ne s'en servent pas — elles stylent en ligne depuis les jetons.
  */
 
-@import url("https://fonts.googleapis.com/css2?family=Caprasimo:wght@400&family=Figtree:wght@400;600;700&display=swap");
-
 :root {
   --color-bg: #d5d6d8;
   --color-surface: #e7e8e9;
@@ -56,9 +54,15 @@
   --color-accent-2-800: #3d472b;
   --color-accent-2-900: #272e1b;
 
-  --font-heading: "Caprasimo", system-ui, sans-serif;
+  /* ⚠️ Seule divergence assumée avec la copie d'Organic : la LIVRAISON des
+     polices. Organic les importe du CDN Google ; ici elles sont
+     auto-hébergées par `next/font/google` (voir app/layout.tsx), qui expose
+     --font-heading-loaded et --font-body-loaded. Les familles sont les
+     mêmes. */
+  --font-heading:
+    var(--font-heading-loaded), "Caprasimo", system-ui, sans-serif;
   --font-heading-weight: 400;
-  --font-body: "Figtree", system-ui, sans-serif;
+  --font-body: var(--font-body-loaded), "Figtree", system-ui, sans-serif;
 
   /* Densité 1,10× déjà appliquée — utiliser ces variables, pas des nombres. */
   --space-1: 4.4px;
