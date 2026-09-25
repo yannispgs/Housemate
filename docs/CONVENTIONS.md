@@ -7,8 +7,8 @@ otherwise. **Updated on every remark from the project owner.**
 > **Inherited from Boardmate**, the sibling project on the same stack (Next 16 +
 > Supabase + Vercel). Same toolchain, same habits, one mental model for both.
 > Divergences are marked ⚠️ **HouseMate** and explain themselves. The *visual*
-> identity, by contrast, is deliberately unrelated — see
-> `design/brief-design-system.md`.
+> identity, by contrast, is deliberately unrelated (design brief, kept out of
+> the repository with the spec — see `AGENTS.md`).
 
 > Sources of truth: Next.js docs (bundled in `node_modules/next/dist/docs/`),
 > React docs (react.dev), TypeScript handbook, Tailwind CSS docs, Supabase docs,

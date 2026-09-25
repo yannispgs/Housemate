@@ -6,7 +6,10 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 # HouseMate
 
-Product spec: `SPEC.md`. Design system brief: `design/brief-design-system.md`.
+Product spec and design brief are **not in this repository**: the repo is
+public, and both are full of real household examples. They live in the Claude
+project memory (`spec/SPEC.md`, `spec/brief-design-system.md`); code comments
+cite them as « SPEC § n ». `data/` is local-only and ignored by git.
 Coding conventions: `docs/CONVENTIONS.md` (inherited from the sibling project
 Boardmate, divergences marked).
 
