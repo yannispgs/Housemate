@@ -17,8 +17,8 @@ permissions:
 # Independent parallel jobs: each fails on its own so it's obvious what broke,
 # and they run concurrently instead of one long sequential job.
 #
-# Integration/RLS, e2e, Sonar and coverage jobs (CONVENTIONS § 10–11) join this
-# file with the Supabase stack, Playwright and the external services they need.
+# Integration/RLS and e2e jobs (CONVENTIONS § 11) join this file with the
+# Supabase stack and Playwright.
 jobs:
   lint:
     name: Lint & format
@@ -63,3 +63,43 @@ jobs:
         uses: ./.github/actions/setup
       - name: Build the app
         run: yarn build
+
+  sonar:
+    name: SonarCloud issues
+    # Pull requests only: the check reads the PR-scoped analysis.
+    if: ${{ github.event_name == 'pull_request' }}
+    runs-on: ubuntu-24.04
+    # The script waits up to 10 minutes for SonarCloud's asynchronous analysis.
+    timeout-minutes: 15
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Fail on SonarCloud issues in the pull request
+        # Stands in for the `new_violations = 0` gate condition the free plan
+        # won't let us configure (see the script's header). Reads the public
+        # API, so no token is involved.
+        run: .github/scripts/sonar-pr-issues.sh
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+
+  coverage:
+    name: Coverage
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set up Node & dependencies
+        uses: ./.github/actions/setup
+      - name: Run tests with coverage
+        run: yarn test:coverage
+      - name: Upload coverage to Codecov
+        # Codecov computes project (total) and patch (changed lines) coverage,
+        # decorates the PR, and gates per codecov.yml. The token avoids the
+        # tokenless shared-IP throttle.
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+        with:
+          files: ./coverage/lcov.info
+          fail_ci_if_error: true
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}

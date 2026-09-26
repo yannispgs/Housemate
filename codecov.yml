@@ -1,0 +1,22 @@
+# Codecov configuration. Coverage is produced by the CI "Coverage" job
+# (Vitest v8 → coverage/lcov.info, scoped to src/lib per
+# vitest.coverage.config.ts) and gated here via PR status checks.
+coverage:
+  status:
+    # Total coverage vs the base commit: fail if it drops by more than the
+    # threshold (the "don't let coverage slip" gate).
+    project:
+      default:
+        target: auto
+        threshold: 1%
+    # Coverage of the lines CHANGED by the PR: fail if less than `target` of the
+    # new/changed (measured) lines are covered — catches features added without
+    # enough tests.
+    patch:
+      default:
+        target: 80%
+
+# Decorate each PR with a coverage comment (total + diff + per-file).
+comment:
+  layout: "condensed_header, diff, files"
+  require_changes: false
