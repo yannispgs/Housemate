@@ -86,6 +86,9 @@ jobs:
   coverage:
     name: Coverage
     runs-on: ubuntu-24.04
+    env:
+      # Secrets can't be read in a step's `if`; expose only whether it is set.
+      HAS_CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN != '' }}
     steps:
       - name: Checkout source code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -93,10 +96,16 @@ jobs:
         uses: ./.github/actions/setup
       - name: Run tests with coverage
         run: yarn test:coverage
+      - name: Codecov not set up yet
+        # Codecov refuses a tokenless upload for this repository. A missing
+        # token is a setup step still to do, not a defect in the PR: say so
+        # instead of failing, as the Sonar job does for an unimported project.
+        if: ${{ env.HAS_CODECOV_TOKEN != 'true' }}
+        run: echo "::warning::CODECOV_TOKEN secret is not set — coverage measured but not uploaded."
       - name: Upload coverage to Codecov
         # Codecov computes project (total) and patch (changed lines) coverage,
-        # decorates the PR, and gates per codecov.yml. The token avoids the
-        # tokenless shared-IP throttle.
+        # decorates the PR, and gates per codecov.yml.
+        if: ${{ env.HAS_CODECOV_TOKEN == 'true' }}
         uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
           files: ./coverage/lcov.info
