@@ -4,6 +4,9 @@
   "private": true,
   "type": "module",
   "packageManager": "yarn@4.16.0",
+  "engines": {
+    "node": ">=24"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",

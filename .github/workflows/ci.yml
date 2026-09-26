@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Cancel superseded runs on the same ref to save minutes.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# Nothing here writes to the repository.
+permissions:
+  contents: read
+
+# Independent parallel jobs: each fails on its own so it's obvious what broke,
+# and they run concurrently instead of one long sequential job.
+#
+# Integration/RLS, e2e, Sonar and coverage jobs (CONVENTIONS § 10–11) join this
+# file with the Supabase stack, Playwright and the external services they need.
+jobs:
+  lint:
+    name: Lint & format
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set up Node & dependencies
+        uses: ./.github/actions/setup
+      - name: Linting & format check
+        run: yarn lint
+
+  typecheck:
+    name: Typecheck
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set up Node & dependencies
+        uses: ./.github/actions/setup
+      - name: Type checking
+        run: yarn tsc --noEmit
+
+  test:
+    name: Unit tests
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set up Node & dependencies
+        uses: ./.github/actions/setup
+      - name: Run unit tests
+        run: yarn test
+
+  build:
+    name: Build
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set up Node & dependencies
+        uses: ./.github/actions/setup
+      - name: Build the app
+        run: yarn build

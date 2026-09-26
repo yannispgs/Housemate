@@ -1,0 +1,25 @@
+name: Setup
+description: Shared Node 24 + Yarn 4 (Corepack) setup with an immutable install.
+
+runs:
+  using: composite
+  steps:
+    - name: Enable Corepack
+      shell: bash
+      run: corepack enable
+
+    - name: Set up Node 24
+      uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      with:
+        node-version: 24
+        # Use the newest available Node 24 patch (matches what Vercel runs)
+        # instead of the runner's bundled version.
+        check-latest: true
+        cache: yarn
+
+    - name: Install dependencies
+      shell: bash
+      # Yarn 4 ships `enableScripts: false` as its own default, so no
+      # package's install script runs here; `--mode=skip-build` would only
+      # restate it and hide the day a dependency genuinely needs building.
+      run: yarn install --immutable # NOSONAR
