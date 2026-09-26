@@ -14,12 +14,11 @@ stock.
 
 | Fichier | Contenu |
 |---|---|
-| `SPEC.md` | Spécification produit — 17 sections |
-| `design/brief-design-system.md` | Brief de design, autoportant |
 | `docs/CONVENTIONS.md` | Conventions de code |
-| `data/referentiel-jardin.json` | Référentiel botanique du jardin, masques de 12 mois |
-| `data/referentiel-jardin.md` | Le même, en frises lisibles |
-| `data/protocole-benchmark-meteo.md` | Protocole de choix de la source météo |
+
+La spécification produit, le brief de design et les données (référentiel du
+jardin, relevés météo) ne sont **pas publiés** : ils décrivent un foyer réel.
+Le code y renvoie sous la forme « SPEC § n ».
 
 ## Stack
 

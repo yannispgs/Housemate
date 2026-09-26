@@ -1,19 +1,31 @@
 @import "tailwindcss";
+@import "./design-system.css";
 
 /*
- * Jetons de conception — brief de design § 4.2.
+ * Couche sémantique — le pont entre les jetons d'Organic et les composants.
  *
- * Les valeurs sombres sont déclarées sous DEUX portées : la requête média
- * couvre le réglage du système, la portée `data-theme` couvre la bascule
- * manuelle, qui doit gagner dans les deux sens.
+ * Les maquettes Claude Design ne consomment JAMAIS `--color-*` directement :
+ * elles écrivent `var(--page)`, `var(--brand)`, `var(--ink-primary)`. Ces
+ * alias sont donc le contrat entre le design et le code, et leurs noms sont
+ * imposés par les maquettes — ne pas les renommer.
  *
- * Le mode sombre est CHOISI, pas inversé : chaque valeur est sélectionnée pour
- * sa surface et validée séparément.
+ * SOURCE : `design_handoff_housemate/README.md`, section « Rôles sémantiques
+ * de l'application ». Les deux jeux de valeurs y sont donnés explicitement.
+ *
+ * ⚠️ Le handoff contredit `valsTheme()` dans `Ecran.dc.html` sur trois
+ * valeurs SOMBRES : `--ink-primary` (neutral-300 contre neutral-100),
+ * `--ink-secondary` (400 contre 300) et `--ink-muted` (500 contre 400). Le
+ * handoff fait foi — c'est le document désigné pour la reproduction — mais
+ * l'écart est à signaler côté design, l'un des deux ayant tort.
+ *
+ * Le mode sombre est CHOISI, pas inversé, et n'est pas encore livré : le
+ * CLAUDE.md du projet de design dit « prévu plus tard, ne pas décrire comme
+ * exclu ». Les valeurs sont là, la bascule ne l'est pas.
  */
 
 @theme inline {
-  --color-surface: var(--surface);
   --color-page: var(--page);
+  --color-surface: var(--surface);
   --color-ink: var(--ink-primary);
   --color-ink-secondary: var(--ink-secondary);
   --color-ink-muted: var(--ink-muted);
@@ -21,82 +33,139 @@
   --color-baseline: var(--baseline);
   --color-border: var(--border);
   --color-brand: var(--brand);
+  --color-brand-strong: var(--brand-strong);
+  --color-brand-border: var(--brand-border);
+  --color-brand-ink: var(--brand-ink);
   --color-period-action: var(--period-action);
   --color-period-observation: var(--period-observation);
-  --color-status-good: var(--status-good);
-  --color-status-warning: var(--status-warning);
-  --color-status-serious: var(--status-serious);
-  --color-status-critical: var(--status-critical);
+  --color-ink-critical: var(--ink-critical);
+  --color-ink-serious: var(--ink-serious);
+  --color-ink-warning: var(--ink-warning);
+  --color-ink-good: var(--ink-good);
+  --color-critical-tint: var(--critical-tint);
 }
 
 :root {
   color-scheme: light;
 
-  --surface: #fcfcfb;
-  --page: #f9f9f7;
-  --ink-primary: #0b0b0b;
-  --ink-secondary: #52514e;
-  --ink-muted: #898781;
-  --grid: #e1e0d9;
-  --baseline: #c3c2b7;
-  --border: rgb(11 11 11 / 0.1);
+  --page: var(--color-bg);
+  --surface: var(--color-surface);
+  --ink-primary: var(--color-text);
+  --ink-secondary: var(--color-neutral-800);
+  --ink-muted: var(--color-neutral-700);
+  --grid: var(--color-neutral-400);
+  --baseline: var(--color-neutral-500);
+  --border: var(--color-divider);
 
-  /* Marque — chrome uniquement, jamais sur une donnée. Brief § 4.4. */
-  --brand: #eda100;
+  --brand: var(--color-accent);
+  --brand-strong: var(--color-accent-700);
+  --brand-border: var(--color-accent-300);
+  --brand-ink: var(--color-accent-700);
 
-  /* Frise — les deux seuls rôles chromatiques. Brief § 4.3. */
-  --period-action: #008300;
-  --period-observation: #2a78d6;
-
-  /* Statuts — réservés, toujours accompagnés d'une icône et d'un libellé. */
-  --status-good: #0ca30c;
-  --status-warning: #fab219;
-  --status-serious: #ec835a;
-  --status-critical: #d03b3b;
+  --ink-critical: #d03b3b;
+  --ink-serious: #ec835a;
+  --ink-warning: #fab219;
+  --ink-good: #0ca30c;
+  --critical-tint: color-mix(in srgb, #d03b3b 14%, var(--page));
 }
 
+/*
+ * Mode sombre — valeurs du handoff. La bascule manuelle doit gagner dans les
+ * deux sens, d'où les deux portées.
+ *
+ * Le lissage de police est exigé par le handoff : sans lui, macOS épaissit le
+ * texte clair sur fond sombre.
+ */
 @media (prefers-color-scheme: dark) {
   :root:where(:not([data-theme="light"])) {
     color-scheme: dark;
 
-    --surface: #1a1a19;
-    --page: #0d0d0d;
-    --ink-primary: #ffffff;
-    --ink-secondary: #c3c2b7;
-    --ink-muted: #898781;
-    --grid: #2c2c2a;
-    --baseline: #383835;
-    --border: rgb(255 255 255 / 0.1);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
 
-    --brand: #c98500;
+    --page: var(--color-neutral-900);
+    --surface: var(--color-neutral-800);
+    --ink-primary: var(--color-neutral-300);
+    --ink-secondary: var(--color-neutral-400);
+    --ink-muted: var(--color-neutral-500);
+    --grid: var(--color-neutral-700);
+    --baseline: var(--color-neutral-500);
+    --border: color-mix(in srgb, var(--color-neutral-100) 16%, transparent);
 
-    --period-action: #008300;
-    --period-observation: #3987e5;
+    --brand: var(--color-accent-500);
+    --brand-strong: var(--color-accent-700);
+    --brand-border: var(--color-accent-500);
+    --brand-ink: var(--color-accent-300);
+
+    --ink-critical: #f07a7a;
+    --ink-serious: #f2a07c;
+    --ink-warning: #f3c655;
+    --ink-good: #5fcf7a;
+    --critical-tint: color-mix(in srgb, #f07a7a 22%, #2a2b2e);
   }
 }
 
 :root[data-theme="dark"] {
   color-scheme: dark;
 
-  --surface: #1a1a19;
-  --page: #0d0d0d;
-  --ink-primary: #ffffff;
-  --ink-secondary: #c3c2b7;
-  --ink-muted: #898781;
-  --grid: #2c2c2a;
-  --baseline: #383835;
-  --border: rgb(255 255 255 / 0.1);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 
-  --brand: #c98500;
+  --page: var(--color-neutral-900);
+  --surface: var(--color-neutral-800);
+  --ink-primary: var(--color-neutral-300);
+  --ink-secondary: var(--color-neutral-400);
+  --ink-muted: var(--color-neutral-500);
+  --grid: var(--color-neutral-700);
+  --baseline: var(--color-neutral-500);
+  --border: color-mix(in srgb, var(--color-neutral-100) 16%, transparent);
 
-  --period-action: #008300;
-  --period-observation: #3987e5;
+  --brand: var(--color-accent-500);
+  --brand-strong: var(--color-accent-700);
+  --brand-border: var(--color-accent-500);
+  --brand-ink: var(--color-accent-300);
+
+  --ink-critical: #f07a7a;
+  --ink-serious: #f2a07c;
+  --ink-warning: #f3c655;
+  --ink-good: #5fcf7a;
+  --critical-tint: color-mix(in srgb, #f07a7a 22%, #2a2b2e);
 }
 
 body {
+  margin: 0;
   background: var(--page);
   color: var(--ink-primary);
-  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-heading);
+  font-weight: var(--font-heading-weight);
+  line-height: 1.12;
+  letter-spacing: -0.015em;
+  margin: 0 0 var(--space-2);
+}
+
+/* États d'interaction thématisés — jamais les défauts du navigateur. */
+:focus {
+  outline: none;
+}
+
+:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--brand) 30%, transparent);
 }
 
 /* Cibles tactiles d'au moins 44 px — l'usage principal est un iPhone. */

@@ -45,3 +45,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# spécification et données du foyer — jamais dans le dépôt public (voir AGENTS.md)
+/SPEC.md
+/data/
+/design/brief-design-system.md
+/docs/REPRISE.md
