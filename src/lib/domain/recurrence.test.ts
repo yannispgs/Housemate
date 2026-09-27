@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { fromSerialised, maskFromRange, maskOf } from "@/lib/domain/month-mask";
 import { fromISO, toISO } from "@/lib/domain/plain-date";
 import {
+  activeSeasonMonths,
   addDuration,
   InvalidRecurrenceError,
   isScheduled,
@@ -343,5 +344,67 @@ describe("addDuration", () => {
     expect(toISO(addDuration(anchor, { count: 1, unit: "year" }, 2))).toBe(
       "2028-01-15",
     );
+  });
+});
+
+describe("intervalles lointains", () => {
+  it("recule quand l'estimation a dépassé, sur une série de 26 ans", () => {
+    // L'estimation compte 30 jours par mois, soit ~0,44 jour de trop chaque
+    // mois : sur 26 ans elle vise quatre répétitions trop loin, et le calcul
+    // doit reculer jusqu'à la bonne.
+    const loyer: ScheduledRecurrence = {
+      kind: "interval",
+      anchor: d("2000-01-15"),
+      every: { count: 1, unit: "month" },
+    };
+
+    expect(next(loyer, "2026-01-16")).toBe("2026-02-15");
+    expect(next(loyer, "2026-01-15")).toBe("2026-01-15");
+  });
+
+  it("gère un intervalle en années", () => {
+    const ramonage: ScheduledRecurrence = {
+      kind: "interval",
+      anchor: d("2019-03-01"),
+      every: { count: 1, unit: "year" },
+    };
+
+    expect(next(ramonage, "2026-06-01")).toBe("2027-03-01");
+  });
+});
+
+describe("séries qui s'arrêtent", () => {
+  it("ne rend rien pour une saison vide", () => {
+    const vide: ScheduledRecurrence = {
+      kind: "seasonal",
+      every: { count: 15, unit: "day" },
+      season: fromSerialised([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+      startDay: 1,
+    };
+
+    expect(nextOccurrences(vide, { from: d("2026-01-01") }, 5)).toEqual([]);
+  });
+
+  it("⚠️ ne rend qu'une échéance, due tout de suite, sans complétion connue", () => {
+    const draps: ScheduledRecurrence = {
+      kind: "sinceCompletion",
+      after: { count: 20, unit: "day" },
+    };
+    const series = nextOccurrences(draps, { from: d("2026-09-28") }, 5);
+
+    expect(series.map(toISO)).toEqual(["2026-09-28"]);
+  });
+});
+
+describe("activeSeasonMonths", () => {
+  it("rend les mois de la fenêtre saisonnière", () => {
+    expect(
+      activeSeasonMonths({
+        kind: "seasonal",
+        every: { count: 15, unit: "day" },
+        season: maskFromRange(4, 9),
+        startDay: 1,
+      }),
+    ).toEqual([4, 5, 6, 7, 8, 9]);
   });
 });

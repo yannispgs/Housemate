@@ -49,6 +49,7 @@ export function isMonth(value: number): value is Month {
 export function monthName(month: Month): string {
   // `MONTH_NAMES` a douze entrées et `Month` est borné à 1..12, mais
   // `noUncheckedIndexedAccess` ne peut pas le savoir.
+  /* c8 ignore next -- repli inatteignable : `Month` est borné à 1..12. */
   return MONTH_NAMES[month - 1] ?? "";
 }
 
