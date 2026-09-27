@@ -1,0 +1,39 @@
+# Local database for development, shaped like Neon (see docker/postgres).
+#
+# Both ports listen on 127.0.0.1 only: this machine is reachable from the
+# internet, and the password below is a local development value, not a secret.
+#
+#   pooled (as the app connects on Neon)  postgres://neondb_owner:housemate-local@127.0.0.1:56432/neondb
+#   direct (migrations)                   postgres://neondb_owner:housemate-local@127.0.0.1:55432/neondb
+name: housemate
+
+services:
+  postgres:
+    build: docker/postgres
+    environment:
+      # Superuser of the container only, used by the init scripts. The app never
+      # connects with it (docker/postgres/init/01-neon-roles.sql explains why).
+      POSTGRES_PASSWORD: housemate-local-superuser
+    ports:
+      - "127.0.0.1:55432:5432"
+    volumes:
+      # From Postgres 18 the image keeps its data under
+      # /var/lib/postgresql/<major>/docker: the volume mounts the parent, so a
+      # future major upgrade can sit next to the old cluster.
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "neondb_owner", "-d", "neondb"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  pgbouncer:
+    build: docker/pgbouncer
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:56432:6432"
+
+volumes:
+  pgdata:
