@@ -5,13 +5,15 @@ on the **official** guidance of each tool when it exists, and reputable sources
 otherwise. **Updated on every remark from the project owner.**
 
 > **Inherited from Boardmate**, the sibling project on the same stack (Next 16 +
-> Supabase + Vercel). Same toolchain, same habits, one mental model for both.
+> Vercel). Same toolchain, same habits, one mental model for both — except the
+> backend: ⚠️ **HouseMate runs on Neon, not Supabase** (§4).
 > Divergences are marked ⚠️ **HouseMate** and explain themselves. The *visual*
 > identity, by contrast, is deliberately unrelated (design brief, kept out of
 > the repository with the spec — see `AGENTS.md`).
 
 > Sources of truth: Next.js docs (bundled in `node_modules/next/dist/docs/`),
-> React docs (react.dev), TypeScript handbook, Tailwind CSS docs, Supabase docs,
+> React docs (react.dev), TypeScript handbook, Tailwind CSS docs, Neon docs,
+> Cloudflare docs,
 > Zod docs.
 
 ## 0. Golden rules
@@ -53,14 +55,44 @@ otherwise. **Updated on every remark from the project owner.**
 - Tailwind class sorting is not auto-enforced yet (Biome's `useSortedClasses`
   is a nursery rule we may enable later).
 
-## 4. Supabase
+## 4. Database, auth and files — Neon, Neon Auth, Cloudflare R2
 
-- Use `@supabase/ssr` for Next (separate browser and server clients).
-- The browser uses the **anon public** key; **never** ship the `service_role`
-  key to the client. Real security = **RLS** + an authenticated session.
-- DB types are generated (`supabase gen types typescript`) and fed to the client
-  generic, so queries are typed.
-- Schema changes are **versioned SQL migrations** under `supabase/migrations/`.
+⚠️ **HouseMate — not Supabase.** Supabase's free plan allows two active
+projects, both taken by Boardmate, and the household's budget for all its tools
+is 5–10 € a month. HouseMate runs on **Neon** (Postgres 18, Frankfurt, 100 free
+projects) and **Cloudflare R2**. The layering (§6) is what made the switch cheap:
+only the adapter changes.
+
+- **Two Neon projects, never one**: `housemate-prod`, and `housemate-previews`
+  holding a `seed` branch plus one branch per PR (§10). Nothing from prod —
+  neither data nor credentials — ever reaches a preview: previews run unreviewed
+  code.
+- **Security is RLS**, with `auth.user_id()` from the `pg_session_jwt` extension.
+  ⚠️ **Database roles are created in SQL, never through the Neon API or console**:
+  those inherit `neon_superuser`, which has `bypassrls` and reads and writes
+  everything. Measured, not assumed.
+- **Pooled vs direct**: the app connects through Neon's pooled endpoint (PgBouncer,
+  transaction mode). Session state does not survive a transaction there — set
+  the user with `set_config(…, true)` inside the transaction, never per
+  session (`docker/verify.sh` reproduces the leak). Migrations use the **direct**
+  endpoint.
+- **Schema changes are versioned SQL migrations** under `db/migrations/`
+  (`NNNN_description.sql`), applied by `yarn db:migrate`. An applied migration is
+  never edited — the runner refuses a changed checksum; fix forward with a new one.
+- **Auth: Neon Auth** (managed Better Auth), sign-in by six-digit code. ⚠️
+  Disabling sign-up does **not** stop code sign-in from creating accounts: the
+  allow-list lives in the blocking **`user.before_create`** webhook (fails closed),
+  and the **`send.otp`** webhook hands code delivery to us (Brevo, household
+  domain, allow-listed addresses only). Verify every webhook signature (Ed25519).
+- **Files: Cloudflare R2**, buckets in the **EU jurisdiction** (a location hint is
+  not a guarantee), one bucket per environment, private, no `r2.dev`, no custom
+  domain. Access only through **short-lived signed URLs** issued after an
+  authorisation check. Objects are named by their SHA-256 (`attachments/<hash>`).
+  The app's R2 tokens are scoped to **one** bucket.
+- **Scheduled jobs: Cloudflare Workers cron triggers** (`workers/`). Each runs on
+  the hour in UTC and decides what to do from the **Paris** hour, in code. All
+  configuration is Worker secrets (`wrangler secret put`); local runs read an
+  ignored `.dev.vars`.
 
 ## 5. Zod
 
@@ -72,7 +104,7 @@ otherwise. **Updated on every remark from the project owner.**
 
 - Layered: `UI → hooks → repository interface → vendor adapter`.
 - `src/lib/domain` is **pure** (no vendor imports).
-- The Supabase SDK is confined to `src/lib/supabase` and the repository adapter.
+- The database driver and the auth SDK are confined to the repository adapter.
   Swapping the backend should mean rewriting only the adapter.
 
 ## 7. Formatting, linting, naming
@@ -191,28 +223,29 @@ otherwise. **Updated on every remark from the project owner.**
   `include-component-in-tag: false`; the GitHub Release is named after that tag.
 - **CD**: deployment on **Vercel** via its native Git integration (preview
   deploy per PR, production on `main`).
-- **Per-PR preview URL**: every PR is reachable at a stable, predictable
-  **`https://pr-<number>.board-mate.app`** (our own domain). A workflow
-  (`.github/workflows/pr-preview-domain.yml`) attaches, when the PR **opens**, a
-  Vercel domain **linked to the PR's Git branch** (`gitBranch`); Vercel then
-  serves that branch's latest READY deployment on the domain automatically for
-  every later push — **no run per commit**. The domain is **deleted when the PR
-  closes/merges**, so it's **two runs per PR** total (attach + detach). Keyed on
-  the unique PR number → names never collide; a renamed branch just means a new
-  PR. Same effect is reproducible by hand (GitHub down / no token): add
-  `pr-<n>.board-mate.app` in the Vercel project's Domains with Git Branch = the
-  PR branch, and remove it after. Needs the `VERCEL_API_TOKEN` repo secret and
-  the `VERCEL_TEAM_ID` / `VERCEL_PROJECT_ID` / `PREVIEW_BASE_DOMAIN` repo
-  variables. Previews run against the **dev** Supabase backend (Preview env);
-  production (`main`) uses the prod backend.
-- **Shared preview session**: set `NEXT_PUBLIC_COOKIE_DOMAIN=.board-mate.app`
-  on the Vercel **Preview** environment (only) so the Supabase auth cookie is
-  scoped to the parent domain — one login is then shared across every
-  `pr-<n>.board-mate.app` preview instead of re-authenticating on each. Leave it
-  **unset** for production and locally (host-only cookies). Safe: dev and prod
-  are different Supabase projects, so their cookie names differ
-  (`sb-<ref>-auth-token`) and never collide. The value is read in
-  `src/lib/supabase/cookie-options.ts` and applied to all three SDK clients.
+- **Functions region**: `fra1` (Frankfurt), next to Neon — set in `vercel.json`,
+  versioned. The default `iad1` would cost a transatlantic round trip per query.
+- **Per-PR preview**: ⚠️ **HouseMate — domain still to be chosen.** The target
+  scheme is `https://pr-<number>.p.<tool>.<domain>`: previews get **their own
+  sub-level** so the shared cookie below never reaches production. DNS stays at
+  Cloudflare as **one wildcard CNAME** (`*.p.<tool>` → Vercel) in **DNS-only**
+  mode (grey cloud): Cloudflare's free proxy certificate covers a single level,
+  so proxied previews would fail TLS; Vercel issues one certificate per preview.
+  The domain is attached to the PR branch when the PR opens and removed when it
+  closes, as in Boardmate (`pr-preview-domain.yml`, `VERCEL_API_TOKEN` secret).
+- **Per-PR database**: the Neon GitHub integration (repo secret `NEON_API_KEY`,
+  variable `NEON_PROJECT_ID` = `housemate-previews`) lets a workflow create a
+  branch from `seed` when the PR opens and delete it when the PR closes — no
+  expiry. On merge, rows added in the PR's branch are merged into `seed`
+  (additions only, sessions included, never for a PR closed unmerged).
+  ⚠️ **At most 9 remote branches besides `main`**: Vercel deploys every pushed
+  branch, each preview consumes a Neon branch, and the free plan allows 10
+  (`seed` + 9). Count before pushing a new branch; delete the branch of a PR
+  closed unmerged. release-please's branch is not built (`vercel.json`
+  `ignoreCommand`).
+- **Shared preview session**: the auth cookie is scoped to
+  `.p.<tool>.<domain>` on the **Preview** environment only, so one login serves
+  every preview. Production and local keep host-only cookies.
 
 ## 11. Testing
 
@@ -231,8 +264,12 @@ separate so the fast one never needs a database:
   ⚠️ This is where the expensive bugs live. A wrong completion date does not
   produce one wrong row — it **shifts the whole future series** (SPEC §3.3), and
   nobody notices. Test the cascade, not just the single value.
-- **Integration / RLS (`yarn test:integration`)** — **Vitest** against a **local
-  Supabase** stack (`supabase start`, Docker), **never a hosted project**. Config:
+- **Integration / RLS (`yarn test:integration`)** — **Vitest** against the
+  **local Neon-like Postgres** (`yarn db:up`, then `yarn db:migrate`; see
+  `compose.yaml`), **never a hosted project**. ⚠️ **HouseMate** — it reproduces the
+  four Neon traits whose absence hides real bugs: Postgres 18, `pg_session_jwt`,
+  Neon's roles with **no superuser for the app** (a superuser bypasses RLS), and
+  PgBouncer in transaction mode; `yarn db:verify` proves it. Config:
   `vitest.integration.config.ts` (`tests/integration/**/*.test.ts`, serial). These
   assert the real security model: **RLS denies the `anon` role on every table**
   (OWASP **A01**), authenticated CRUD works, and two invariants of our own:
@@ -244,14 +281,17 @@ separate so the fast one never needs a database:
   ⚠️ **HouseMate — the attachments bucket is private**, unlike Boardmate's
   public-read `logos`. It holds photographed invoices, serial numbers and
   warranty papers: authenticated read **and** write, never public. Assert it. Real
-  authenticated sessions are minted server-side (`auth.admin.createUser` +
-  `signInWithPassword`) — **no inbox needed**. Local Supabase ships fixed default
-  keys, so **no secrets** are required; connection details come from
-  `supabase status` (`tests/integration/env.ts`). Runs in the
-  `Integration & RLS tests` CI job, which boots `supabase start` on the runner.
+  users are simulated by setting the JWT claims inside the transaction, as
+  Neon's Data API does — **no inbox needed**. The local database uses fixed
+  development credentials bound to 127.0.0.1, so **no secrets** are required
+  (`tests/integration/env.ts`). Writes are tested **with the least-privileged
+  role that performs them in production**, to test its grants too.
 - **E2E (`yarn test:e2e`)** — a **few** **Playwright** journeys only, run in a
-  real Chromium against the app **built and served locally** and wired to the
-  **local Supabase** stack (`supabase start`, Docker) — never a hosted project.
+  real browser against the app **built and served locally** and wired to the
+  local database — never the production project. ⚠️ **HouseMate — open
+  question**: Neon Auth is a managed service with no local equivalent, so the
+  login journey cannot run fully offline; decide when auth lands between a
+  preview Neon branch for e2e and a local auth stand-in.
   Config: `playwright.config.ts` (`tests/e2e/**`, one worker). A `setup` project
   performs **one real OTP login via the mail catcher** (the local stack catches
   email in **Mailpit**, exposed as `INBUCKET_URL`) and saves the session
@@ -261,9 +301,7 @@ separate so the fast one never needs a database:
   lifecycle** (create → attach a photo → archive → still searchable), and **one
   full completion cycle** (an occurrence falls due → tick it → the next one is
   recomputed → tick it retroactively and check the consequence is shown *before*
-  validation). Fixtures are seeded with the **service role**, mirroring the integration suite; **no
-  secrets** are required (local Supabase ships fixed default keys; connection
-  details come from `supabase status`).
+  validation). Fixtures come from the repository's fictional `seed.sql`.
   - **Two tiers.** The **critical** journeys are tagged `@critical` (login
     happy/invalid/anon-redirect, player lifecycle, one full game). They run
     **per-PR** on **both WebKit and Chromium**, as **parallel matrix jobs**
@@ -293,11 +331,11 @@ separate so the fast one never needs a database:
   **`/* c8 ignore … */`** on (a) the Realtime `subscribe()` channel glue, (b)
   defensive DB-error guards (`if (error) throw …` on healthy selects/updates),
   and (c) defensive `?? null` / `|| …` fallbacks — each with a one-line reason.
-  Never mock the Supabase client to hit a branch; either trigger it for real
+  Never mock the database driver to hit a branch; either trigger it for real
   (constraint violations, not-found) or `c8 ignore` it with justification. Pure
   logic buried in a glue file is **extracted** to its own module so it can be
   unit-tested and measured (e.g. `auth/retry-delay.ts` out of `rate-limit.ts`).
-- **Skip**: per-component/snapshot tests, mocking the Supabase client,
+- **Skip**: per-component/snapshot tests, mocking the database driver,
   perf/load, visual-regression (Vercel preview + occasional screenshot suffices).
 
 ## 12. Dates & times
@@ -348,3 +386,9 @@ server's.
   which runs both in the browser (offline completion recomputes its own series)
   and on the server. Written once, tested once — this is what forced a single
   language across the stack.
+- _2026-09-27_ — ⚠️ **Neon + Cloudflare R2 + Workers instead of Supabase** (§4):
+  Supabase's two free projects are Boardmate's, and the budget is 5–10 €/month
+  for every tool. Decided after a measured trial (RLS, code sign-in, allow-list
+  webhook failing closed, sessions across branches, EU-jurisdiction R2).
+- _2026-09-27_ — Previews: one Neon branch per PR from `seed`, at most **9
+  remote branches** besides `main`, functions in `fra1` (§10).
