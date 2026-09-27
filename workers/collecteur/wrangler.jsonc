@@ -1,0 +1,16 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "housemate-collecteur",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-25",
+  // Chaque heure pleine, en UTC. L'heure de Paris se calcule dans le code
+  // (src/schedule.ts), pour que 20 h reste 20 h aux changements d'heure.
+  "triggers": { "crons": ["0 * * * *"] },
+  // Rien à servir : pas d'adresse publique pour ce Worker.
+  "workers_dev": false,
+  "preview_urls": false,
+  "observability": { "enabled": true }
+  // Toute la configuration est secrète : `wrangler secret put <NOM>` pour
+  // DATABASE_URL, SWITCHBOT_TOKEN, SWITCHBOT_SECRET, SENSOR_EXTERIOR_ID,
+  // SENSOR_VERANDA_ID, LATITUDE, LONGITUDE.
+}
