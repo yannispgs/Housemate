@@ -64,7 +64,7 @@ export function parseOpenMeteo(payload: unknown): ForecastPoint[] {
   const times = hourly?.time;
 
   if (!Array.isArray(times)) {
-    throw new Error("Open-Meteo : réponse sans série horaire.");
+    throw new TypeError("Open-Meteo : réponse sans série horaire.");
   }
 
   const points: ForecastPoint[] = [];
@@ -118,7 +118,7 @@ export function parseMetNorway(payload: unknown, now: Date): ForecastPoint[] {
   ).properties;
 
   if (!Array.isArray(properties?.timeseries)) {
-    throw new Error("Met Norway : réponse sans série temporelle.");
+    throw new TypeError("Met Norway : réponse sans série temporelle.");
   }
 
   const updatedAt = properties.meta?.updated_at;

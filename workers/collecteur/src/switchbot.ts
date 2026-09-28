@@ -39,7 +39,7 @@ export async function signedHeaders(
     key,
     encoder.encode(`${token}${timestamp}${nonce}`),
   );
-  const sign = btoa(String.fromCharCode(...new Uint8Array(signature)));
+  const sign = btoa(String.fromCodePoint(...new Uint8Array(signature)));
 
   return {
     Authorization: token,

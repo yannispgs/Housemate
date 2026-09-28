@@ -61,7 +61,9 @@ export function planMigrations(
   const appliedVersions = new Set(applied.map(migration => migration.version));
   const sorted = [...files].sort((a, b) => a.version.localeCompare(b.version));
   const pending = sorted.filter(file => !appliedVersions.has(file.version));
-  const lastApplied = [...appliedVersions].sort().at(-1);
+  const lastApplied = [...appliedVersions]
+    .sort((a, b) => a.localeCompare(b))
+    .at(-1);
 
   if (lastApplied !== undefined) {
     for (const file of pending) {
