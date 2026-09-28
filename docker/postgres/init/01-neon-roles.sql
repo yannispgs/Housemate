@@ -10,11 +10,9 @@
 -- `neondb_owner`: can create roles and databases, but is not a superuser.
 CREATE ROLE neondb_owner LOGIN CREATEDB CREATEROLE;
 
--- The two request roles of Neon's Data API. Policies target them; they never
--- log in directly.
-CREATE ROLE authenticated NOLOGIN;
-CREATE ROLE anonymous NOLOGIN;
-GRANT authenticated, anonymous TO neondb_owner;
+-- No `authenticated` / `anonymous` here: a Neon project without the Data API
+-- has none either, and migration 0003 creates them. Creating them here once
+-- hid a real production failure (the owner lacked the SET right on them).
 
 CREATE DATABASE neondb OWNER neondb_owner;
 
@@ -24,4 +22,8 @@ CREATE DATABASE neondb OWNER neondb_owner;
 -- in a migration. On Neon the extension is provided by the platform.
 CREATE EXTENSION pg_session_jwt;
 
-GRANT USAGE ON SCHEMA auth TO authenticated, anonymous;
+-- As on Neon (measured 2026-09-28): the `auth` schema is reachable by the
+-- database owner ONLY. The request roles get no access to it, and the owner
+-- cannot pass it on, so policies reach `auth.user_id()` through SECURITY
+-- DEFINER functions owned by the owner (migration 0003).
+GRANT USAGE ON SCHEMA auth TO neondb_owner;

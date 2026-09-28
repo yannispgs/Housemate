@@ -5,7 +5,8 @@
 # `auth.user_id()` from pg_session_jwt, and session state lost across
 # transactions behind the pooler.
 #
-# Runs in a throwaway schema and leaves nothing behind.
+# Runs in a throwaway schema and leaves nothing behind. Run it AFTER the
+# migrations: they create the request roles, as on Neon.
 set -euo pipefail
 
 readonly POOLED="postgres://neondb_owner@127.0.0.1:56432/neondb"
@@ -38,18 +39,28 @@ psql_q "$DIRECT_IN" "
   create schema verify;
   create table verify.notes (owner text not null, body text not null);
   alter table verify.notes enable row level security;
+  create function verify.user_id() returns text
+    language sql stable security definer set search_path = ''
+    as \$\$ select auth.user_id() \$\$;
   create policy own_notes on verify.notes to authenticated
-    using (owner = auth.user_id());
+    using (owner = verify.user_id());
   grant usage on schema verify to authenticated, anonymous;
   grant select on verify.notes to authenticated, anonymous;
   insert into verify.notes values ('alice', 'a'), ('bob', 'b');
 " >/dev/null
 
+echo "1b. The request roles cannot reach auth.user_id() directly, as on Neon"
+direct=$(psql_q "$DIRECT_IN" "select has_schema_privilege('authenticated', 'auth', 'USAGE')")
+[[ "$direct" = "f" ]] || fail "authenticated can use schema auth: Neon does not allow it"
+echo "   ✅ only the owner reaches auth (policies go through SECURITY DEFINER)"
+
 echo "2. RLS through auth.user_id(), via the pooler"
+# The identity is read once as the owner BEFORE switching role: first loaded
+# inside a SECURITY DEFINER function, pg_session_jwt loses it (migration 0003).
 seen=$(psql_q "$POOLED_IN" "
   begin;
+  select set_config('request.jwt.claims', '{\"sub\":\"alice\"}', true), auth.user_id();
   set local role authenticated;
-  select set_config('request.jwt.claims', '{\"sub\":\"alice\"}', true);
   select string_agg(owner, ',') from verify.notes;
   commit;" | tail -1)
 [[ "$seen" = "alice" ]] || fail "authenticated as alice saw '$seen'"
