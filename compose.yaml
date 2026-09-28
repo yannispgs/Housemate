@@ -10,6 +10,9 @@ name: housemate
 
 services:
   postgres:
+    # Named, so that CI can build it with a cache (docker/bake-action) and
+    # compose then starts exactly that image.
+    image: housemate-postgres:local
     build: docker/postgres
     environment:
       # No password at all, for any role: the ports are bound to 127.0.0.1.
@@ -30,6 +33,7 @@ services:
       retries: 30
 
   pgbouncer:
+    image: housemate-pgbouncer:local
     build: docker/pgbouncer
     depends_on:
       postgres:

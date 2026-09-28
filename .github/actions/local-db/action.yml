@@ -1,0 +1,39 @@
+name: Local database
+description: >-
+  Builds the Neon-like local database from compose.yaml, with its layers cached
+  in GitHub Actions, starts it and applies the migrations.
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+    - name: Build the images, with a cache
+      # The Postgres image compiles pg_session_jwt in Rust: over ten minutes
+      # uncached. Each image keeps its own cache scope so neither evicts the
+      # other.
+      uses: docker/bake-action@018cb6412ab401ebaa809aa5f85966b74628600f # v7.4.0
+      with:
+        source: .
+        files: compose.yaml
+        load: true
+        set: |
+          postgres.cache-from=type=gha,scope=local-db-postgres
+          postgres.cache-to=type=gha,mode=max,scope=local-db-postgres
+          pgbouncer.cache-from=type=gha,scope=local-db-pgbouncer
+          pgbouncer.cache-to=type=gha,mode=max,scope=local-db-pgbouncer
+
+    - name: Start the database
+      shell: bash
+      run: docker compose up -d --wait --no-build
+
+    - name: Check it behaves like Neon
+      shell: bash
+      run: yarn db:verify
+
+    - name: Apply the migrations
+      shell: bash
+      run: yarn db:migrate
+      env:
+        MIGRATION_DATABASE_URL: postgres://neondb_owner@127.0.0.1:55432/neondb

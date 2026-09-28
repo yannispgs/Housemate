@@ -17,8 +17,7 @@ permissions:
 # Independent parallel jobs: each fails on its own so it's obvious what broke,
 # and they run concurrently instead of one long sequential job.
 #
-# Integration/RLS and e2e jobs (CONVENTIONS § 11) join this file with the
-# Supabase stack and Playwright.
+# The e2e job (CONVENTIONS § 11) joins this file with Playwright.
 jobs:
   lint:
     name: Lint & format
@@ -65,6 +64,20 @@ jobs:
       - name: Build the app
         run: yarn build
 
+  integration:
+    name: Integration tests
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set up Node & dependencies
+        uses: ./.github/actions/setup
+      - name: Start the Neon-like local database
+        # Local, never a hosted project: no secret involved (CONVENTIONS § 11).
+        uses: ./.github/actions/local-db
+      - name: Run integration tests
+        run: yarn test:integration
+
   sonar:
     name: SonarCloud issues
     # Pull requests only: the check reads the PR-scoped analysis.
@@ -95,6 +108,9 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Set up Node & dependencies
         uses: ./.github/actions/setup
+      - name: Start the Neon-like local database
+        # Coverage merges unit and integration suites; the latter needs it.
+        uses: ./.github/actions/local-db
       - name: Run tests with coverage
         run: yarn test:coverage
       - name: Codecov not set up yet

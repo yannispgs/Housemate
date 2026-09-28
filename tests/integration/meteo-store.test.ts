@@ -117,6 +117,14 @@ describe("insertForecasts", () => {
   });
 });
 
+describe("sans rien à écrire", () => {
+  it("n'envoie aucune requête pour une liste de prévisions vide", async () => {
+    await expect(
+      asCollector(sql => insertForecasts(sql, new Date(), [])),
+    ).resolves.toBeUndefined();
+  });
+});
+
 describe("droits du collecteur", () => {
   it("ne peut rien lire, même ce qu'il écrit", async () => {
     await expect(
