@@ -85,6 +85,8 @@ export function parseMeterStatus(payload: unknown): MeterReading {
   };
 }
 
+/* c8 ignore start -- appel réseau seul : la signature et la lecture sont
+   testées à part, l'ensemble est vérifié par l'essai réel du collecteur. */
 /** Lit un capteur maintenant. */
 export async function readMeter(
   credentials: SwitchBotCredentials,
@@ -106,3 +108,4 @@ export async function readMeter(
 
   return parseMeterStatus(await response.json());
 }
+/* c8 ignore stop */

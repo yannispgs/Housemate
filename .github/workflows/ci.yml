@@ -40,7 +40,8 @@ jobs:
       - name: Set up Node & dependencies
         uses: ./.github/actions/setup
       - name: Type checking
-        run: yarn tsc --noEmit
+        # Both projects: the app and the Worker (own tsconfig, Cloudflare types).
+        run: yarn typecheck
 
   test:
     name: Unit tests

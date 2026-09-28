@@ -95,6 +95,29 @@ describe("parseMetNorway", () => {
     expect(points[0]?.issuedAt).toEqual(new Date("2026-09-27T19:17:15Z"));
   });
 
+  it("saute un pas sans température au lieu d'inventer une valeur", () => {
+    const points = parseMetNorway(
+      {
+        properties: {
+          timeseries: [
+            {
+              time: "2026-09-27T22:00:00Z",
+              data: { instant: { details: {} } },
+            },
+            {
+              time: "2026-09-27T23:00:00Z",
+              data: { instant: { details: { air_temperature: 12 } } },
+            },
+          ],
+        },
+      },
+      now,
+    );
+
+    expect(points.map(point => point.temperature)).toEqual([12]);
+    expect(points[0]?.issuedAt).toBeNull();
+  });
+
   it("refuse une réponse sans série temporelle", () => {
     expect(() => parseMetNorway({}, now)).toThrow(/série temporelle/);
   });
