@@ -455,3 +455,90 @@ describe("activeSeasonMonths", () => {
     ).toEqual([4, 5, 6, 7, 8, 9]);
   });
 });
+
+describe("modificateur c — premier intervalle distinct", () => {
+  // Contrôle technique : 4 ans après la mise en circulation, puis tous les 2.
+  const controleTechnique: ScheduledRecurrence = {
+    kind: "interval",
+    anchor: d("2022-03-15"),
+    firstAfter: { count: 4, unit: "year" },
+    every: { count: 2, unit: "year" },
+  };
+
+  it("⚠️ saute d'abord de 4 ans, et non de 2", () => {
+    expect(next(controleTechnique, "2023-01-01")).toBe("2026-03-15");
+  });
+
+  it("n'a jamais l'ancre pour occurrence", () => {
+    expect(next(controleTechnique, "2022-01-01")).toBe("2026-03-15");
+  });
+
+  it("puis suit le rythme de 2 ans", () => {
+    expect(next(controleTechnique, "2026-03-16")).toBe("2028-03-15");
+    expect(
+      nextOccurrences(controleTechnique, { from: d("2026-01-01") }, 3).map(
+        toISO,
+      ),
+    ).toEqual(["2026-03-15", "2028-03-15", "2030-03-15"]);
+  });
+
+  it("refuse un premier saut nul", () => {
+    expect(() =>
+      next(
+        { ...controleTechnique, firstAfter: { count: 0, unit: "year" } },
+        "2026-01-01",
+      ),
+    ).toThrow(InvalidRecurrenceError);
+  });
+});
+
+describe("modificateur b — au premier des deux termes échus", () => {
+  // Révision tous les ans, ou plus tôt si le kilométrage estimé l'impose.
+  const revision: ScheduledRecurrence = {
+    kind: "composite",
+    parts: [
+      {
+        kind: "interval",
+        anchor: d("2025-06-01"),
+        every: { count: 1, unit: "year" },
+      },
+      // Date estimée à partir des relevés de kilométrage (SPEC § 5.3).
+      { kind: "once", on: d("2026-02-10") },
+    ],
+  };
+
+  it("retient le terme le plus proche", () => {
+    expect(next(revision, "2025-12-01")).toBe("2026-02-10");
+  });
+
+  it("passe au terme suivant une fois le premier franchi", () => {
+    expect(next(revision, "2026-02-11")).toBe("2026-06-01");
+  });
+
+  it("déroule une série qui mêle les deux motifs", () => {
+    expect(
+      nextOccurrences(revision, { from: d("2025-12-01") }, 3).map(toISO),
+    ).toEqual(["2026-02-10", "2026-06-01", "2027-06-01"]);
+  });
+
+  it("ne rend plus rien quand aucun motif n'a de suite", () => {
+    expect(
+      next(
+        {
+          kind: "composite",
+          parts: [
+            { kind: "once", on: d("2025-01-01") },
+            { kind: "once", on: d("2025-06-01") },
+          ],
+        },
+        "2026-01-01",
+      ),
+    ).toBeNull();
+  });
+
+  it("refuse une composite sans motif", () => {
+    expect(() => next({ kind: "composite", parts: [] }, "2026-01-01")).toThrow(
+      /sans motif/,
+    );
+  });
+});
