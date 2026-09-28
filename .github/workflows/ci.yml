@@ -78,6 +78,35 @@ jobs:
       - name: Run integration tests
         run: yarn test:integration
 
+  e2e:
+    name: E2E critical (${{ matrix.browser }})
+    runs-on: ubuntu-24.04
+    # The @critical journeys gate every PR, on BOTH engines, as parallel matrix
+    # jobs so the second engine costs no extra wall-clock. WebKit is the
+    # reference engine here: the primary use is the web app on an iPhone.
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [webkit, chromium]
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set up Node & dependencies
+        uses: ./.github/actions/setup
+      - name: Install the browser and its system libraries
+        # Playwright downloading a browser: no package is installed here.
+        run: yarn playwright install --with-deps ${{ matrix.browser }} # NOSONAR
+      - name: Run the critical journeys
+        run: yarn playwright test --project=${{ matrix.browser }} --grep @critical
+      - name: Upload the report
+        # Kept on failure so a red journey can be debugged from the run page.
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: playwright-report-critical-${{ matrix.browser }}
+          path: playwright-report/
+          retention-days: 7
+
   sonar:
     name: SonarCloud issues
     # Pull requests only: the check reads the PR-scoped analysis.
