@@ -16,6 +16,22 @@ export interface ForecastPoint {
   readonly temperature: number;
 }
 
+/**
+ * Un cumul de pluie prévu sur un intervalle. Début et fin sont explicites : les
+ * sources ne datent pas un cumul de la même façon (voir parseOpenMeteoRain et
+ * parseMetNorwayRain).
+ */
+export interface RainPoint {
+  readonly source: "open-meteo" | "met-norway";
+  readonly model: string;
+  readonly issuedAt: Date | null;
+  readonly start: Date;
+  readonly end: Date;
+  readonly millimetres: number;
+}
+
+const HOUR = 3_600_000;
+
 export interface Coordinates {
   readonly latitude: number;
   readonly longitude: number;
@@ -38,11 +54,14 @@ export const OPEN_METEO_MODELS = [
 export const MET_NORWAY_USER_AGENT =
   "housemate/0.1 github.com/yannispgs/housemate";
 
-export function openMeteoUrl({ latitude, longitude }: Coordinates): string {
+export function openMeteoUrl(
+  { latitude, longitude }: Coordinates,
+  variable: "temperature_2m" | "precipitation",
+): string {
   const params = new URLSearchParams({
     latitude: String(latitude),
     longitude: String(longitude),
-    hourly: "temperature_2m",
+    hourly: variable,
     models: OPEN_METEO_MODELS.join(","),
     forecast_hours: String(HORIZON_HOURS),
     // Des instants sans fuseau à interpréter : aucune ambiguïté au changement
@@ -86,6 +105,49 @@ export function parseOpenMeteo(payload: unknown): ForecastPoint[] {
           issuedAt: null,
           target: new Date(time * 1000),
           temperature: value,
+        });
+      }
+    });
+  }
+
+  return points;
+}
+
+/**
+ * La pluie de chaque modèle, heure par heure.
+ *
+ * ⚠️ Chez Open-Meteo, la valeur datée T est le cumul de l'heure ÉCOULÉE : elle
+ * couvre [T − 1 h, T]. La pluie de 8 h à 9 h est donc celle datée 9 h.
+ */
+export function parseOpenMeteoRain(payload: unknown): RainPoint[] {
+  const hourly = (payload as { hourly?: Record<string, unknown> }).hourly;
+  const times = hourly?.time;
+
+  if (!Array.isArray(times)) {
+    throw new TypeError("Open-Meteo : réponse sans série horaire.");
+  }
+
+  const points: RainPoint[] = [];
+
+  for (const model of OPEN_METEO_MODELS) {
+    const values = hourly?.[`precipitation_${model}`];
+
+    if (!Array.isArray(values)) {
+      continue;
+    }
+
+    values.forEach((value, index) => {
+      const time = times[index];
+
+      if (typeof value === "number" && typeof time === "number") {
+        const end = new Date(time * 1000);
+        points.push({
+          source: "open-meteo",
+          model,
+          issuedAt: null,
+          start: new Date(end.getTime() - HOUR),
+          end,
+          millimetres: value,
         });
       }
     });
@@ -142,6 +204,62 @@ export function parseMetNorway(payload: unknown, now: Date): ForecastPoint[] {
         issuedAt,
         target,
         temperature,
+      });
+    }
+  }
+
+  return points;
+}
+
+/**
+ * La pluie de Met Norway, heure par heure.
+ *
+ * ⚠️ À l'inverse d'Open-Meteo, la valeur datée T (`next_1_hours`) est le cumul
+ * de l'heure À VENIR : elle couvre [T, T + 1 h]. Au-delà de deux jours et
+ * demi, Met Norway ne donne plus que des cumuls sur six heures : ils sont
+ * ignorés, le créneau utile tombant toujours bien avant.
+ */
+export function parseMetNorwayRain(payload: unknown, now: Date): RainPoint[] {
+  const properties = (
+    payload as {
+      properties?: {
+        meta?: { updated_at?: unknown };
+        timeseries?: {
+          time?: unknown;
+          data?: {
+            next_1_hours?: { details?: { precipitation_amount?: unknown } };
+          };
+        }[];
+      };
+    }
+  ).properties;
+
+  if (!Array.isArray(properties?.timeseries)) {
+    throw new TypeError("Met Norway : réponse sans série temporelle.");
+  }
+
+  const updatedAt = properties.meta?.updated_at;
+  const issuedAt = typeof updatedAt === "string" ? new Date(updatedAt) : null;
+  const horizon = now.getTime() + HORIZON_HOURS * HOUR;
+  const points: RainPoint[] = [];
+
+  for (const step of properties.timeseries) {
+    const amount = step.data?.next_1_hours?.details?.precipitation_amount;
+
+    if (typeof step.time !== "string" || typeof amount !== "number") {
+      continue;
+    }
+
+    const start = new Date(step.time);
+
+    if (start.getTime() < horizon) {
+      points.push({
+        source: "met-norway",
+        model: "locationforecast",
+        issuedAt,
+        start,
+        end: new Date(start.getTime() + HOUR),
+        millimetres: amount,
       });
     }
   }

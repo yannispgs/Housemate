@@ -13,11 +13,20 @@ import {
   metNorwayUrl,
   openMeteoUrl,
   parseMetNorway,
+  parseMetNorwayRain,
   parseOpenMeteo,
+  parseOpenMeteoRain,
+  type RainPoint,
 } from "./forecasts";
-import { parisHour, shouldFetchForecasts, shouldReadSensors } from "./schedule";
+import {
+  parisHour,
+  shouldFetchRainForecasts,
+  shouldFetchTemperatureForecasts,
+  shouldReadSensors,
+} from "./schedule";
 import {
   insertForecasts,
+  insertRainForecasts,
   insertReadings,
   type Reading,
   type Sql,
@@ -74,24 +83,22 @@ async function fetchJson(url: string, init?: RequestInit): Promise<unknown> {
   return response.json();
 }
 
-async function collectForecasts(env: Env, sql: Sql): Promise<void> {
-  const where: Coordinates = {
-    latitude: Number(env.LATITUDE),
-    longitude: Number(env.LONGITUDE),
-  };
-  const retrievedAt = new Date();
-  const sources: Promise<ForecastPoint[]>[] = [
-    fetchJson(openMeteoUrl(where)).then(parseOpenMeteo),
-    fetchJson(metNorwayUrl(where), {
-      headers: { "User-Agent": MET_NORWAY_USER_AGENT },
-    }).then(payload => parseMetNorway(payload, retrievedAt)),
-  ];
+/**
+ * Chaque source échoue seule : on enregistre ce qui est arrivé, PUIS on fait
+ * échouer l'exécution, pour qu'une source muette se voie dans les journaux du
+ * Worker au lieu de passer inaperçue.
+ */
+async function storeThenReport<T>(
+  sources: Promise<T[]>[],
+  store: (points: T[]) => Promise<void>,
+): Promise<void> {
   const results = await Promise.allSettled(sources);
-  const points = results.flatMap(result =>
-    result.status === "fulfilled" ? result.value : [],
-  );
 
-  await insertForecasts(sql, retrievedAt, points);
+  await store(
+    results.flatMap(result =>
+      result.status === "fulfilled" ? result.value : [],
+    ),
+  );
 
   const failures = results.filter(result => result.status === "rejected");
 
@@ -100,6 +107,40 @@ async function collectForecasts(env: Env, sql: Sql): Promise<void> {
       `Prévisions manquantes — ${failures.map(failure => String(failure.reason)).join(" ; ")}`,
     );
   }
+}
+
+function coordinates(env: Env): Coordinates {
+  return { latitude: Number(env.LATITUDE), longitude: Number(env.LONGITUDE) };
+}
+
+const MET_NORWAY_HEADERS = { headers: { "User-Agent": MET_NORWAY_USER_AGENT } };
+
+async function collectTemperatureForecasts(env: Env, sql: Sql): Promise<void> {
+  const where = coordinates(env);
+  const retrievedAt = new Date();
+  await storeThenReport<ForecastPoint>(
+    [
+      fetchJson(openMeteoUrl(where, "temperature_2m")).then(parseOpenMeteo),
+      fetchJson(metNorwayUrl(where), MET_NORWAY_HEADERS).then(payload =>
+        parseMetNorway(payload, retrievedAt),
+      ),
+    ],
+    points => insertForecasts(sql, retrievedAt, points),
+  );
+}
+
+async function collectRainForecasts(env: Env, sql: Sql): Promise<void> {
+  const where = coordinates(env);
+  const retrievedAt = new Date();
+  await storeThenReport<RainPoint>(
+    [
+      fetchJson(openMeteoUrl(where, "precipitation")).then(parseOpenMeteoRain),
+      fetchJson(metNorwayUrl(where), MET_NORWAY_HEADERS).then(payload =>
+        parseMetNorwayRain(payload, retrievedAt),
+      ),
+    ],
+    points => insertRainForecasts(sql, retrievedAt, points),
+  );
 }
 
 export default {
@@ -112,8 +153,12 @@ export default {
       tasks.push(collectReadings(env, sql));
     }
 
-    if (shouldFetchForecasts(hour)) {
-      tasks.push(collectForecasts(env, sql));
+    if (shouldFetchTemperatureForecasts(hour)) {
+      tasks.push(collectTemperatureForecasts(env, sql));
+    }
+
+    if (shouldFetchRainForecasts(hour)) {
+      tasks.push(collectRainForecasts(env, sql));
     }
 
     // Les deux tâches vont au bout même si l'une échoue ; l'échec est ensuite

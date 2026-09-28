@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { parisHour, shouldFetchForecasts, shouldReadSensors } from "./schedule";
+import {
+  parisHour,
+  shouldFetchRainForecasts,
+  shouldFetchTemperatureForecasts,
+  shouldReadSensors,
+} from "./schedule";
 
 describe("parisHour", () => {
   it("ajoute deux heures en été", () => {
@@ -32,12 +37,14 @@ describe("shouldReadSensors", () => {
   });
 });
 
-describe("shouldFetchForecasts", () => {
-  it("ne fige les prévisions qu'à 20 h", () => {
-    const hours = Array.from({ length: 24 }, (_, hour) => hour).filter(
-      shouldFetchForecasts,
-    );
+describe("prévisions figées une fois par soir", () => {
+  const hours = Array.from({ length: 24 }, (_, hour) => hour);
 
-    expect(hours).toEqual([20]);
+  it("fige les températures à 20 h, avec le relevé du gel", () => {
+    expect(hours.filter(shouldFetchTemperatureForecasts)).toEqual([20]);
+  });
+
+  it("fige la pluie à 22 h, l'heure du rappel de crèche", () => {
+    expect(hours.filter(shouldFetchRainForecasts)).toEqual([22]);
   });
 });

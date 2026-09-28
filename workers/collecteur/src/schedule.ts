@@ -36,7 +36,17 @@ export function shouldReadSensors(hour: number): boolean {
   return hour >= 20 || hour <= 9;
 }
 
-/** Les prévisions se figent une fois par soir, avec le relevé de 20 h. */
-export function shouldFetchForecasts(hour: number): boolean {
+/** Les températures prévues se figent à 20 h, avec le relevé du gel. */
+export function shouldFetchTemperatureForecasts(hour: number): boolean {
   return hour === 20;
+}
+
+/**
+ * La pluie prévue se fige à 22 h, l'heure du rappel de crèche (SPEC § 12.9),
+ * pour qu'il décide sur la prévision la plus fraîche. Tous les soirs, pas
+ * seulement les veilles de crèche : autant de soirées de plus pour comparer
+ * les modèles, pour un appel de plus par jour.
+ */
+export function shouldFetchRainForecasts(hour: number): boolean {
+  return hour === 22;
 }
