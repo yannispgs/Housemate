@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "./design-system.css";
+@import "./frise.css";
 
 /*
  * Couche sémantique — le pont entre les jetons d'Organic et les composants.

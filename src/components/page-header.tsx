@@ -8,10 +8,10 @@
 export function PageHeader({
   title,
   purpose,
-}: {
+}: Readonly<{
   title: string;
   purpose: string;
-}) {
+}>) {
   return (
     <header className="mb-6">
       <h1 className="text-xl font-semibold text-ink">{title}</h1>
@@ -25,7 +25,7 @@ export function PageHeader({
  * Volontairement visible : une zone vide sans explication se confond avec un
  * bug, et l'état vide de l'accueil a un sens très différent (SPEC § 2).
  */
-export function Placeholder({ children }: { children: string }) {
+export function Placeholder({ children }: Readonly<{ children: string }>) {
   return (
     <p className="rounded-md border border-dashed border-baseline px-4 py-6 text-sm text-ink-muted">
       {children}

@@ -60,7 +60,9 @@ export const viewport: Viewport = {
   ],
 };
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+export default function RootLayout({
+  children,
+}: Readonly<{ children: ReactNode }>) {
   return (
     <html lang="fr" className={`${caprasimo.variable} ${figtree.variable}`}>
       <body>

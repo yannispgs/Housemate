@@ -1,0 +1,19 @@
+/*
+ * Jetons propres à HouseMate — ils ne viennent pas d'Organic et n'ont pas à
+ * y retourner. Dans leur propre fichier plutôt que dans design-system.css :
+ * celui-ci reste une copie conforme du design system, qu'on réimporte sans
+ * rien trier.
+ *
+ * ⚠️ Les contrastes ci-dessous ont été REMESURÉS sur le nouveau fond
+ * #d5d6d8 le 23/09/2026. Les valeurs du brief § 4 dataient du fond crème
+ * #f5ead8 et sont périmées.
+ */
+:root {
+  /* Frise — les deux seuls rôles chromatiques (brief § 4.3). */
+  --period-action: #008300; /* 3,40:1 sur le fond */
+  --period-observation: #2a78d6; /* 3,04:1 — tient, sans marge */
+
+  /* Les couleurs de statut sont des RÔLES et vivent dans globals.css
+     (--ink-critical, --ink-serious, --ink-warning, --ink-good), parce
+     qu'elles changent entre clair et sombre. */
+}
