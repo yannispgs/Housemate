@@ -36,6 +36,25 @@ export interface EffectiveImportance {
   readonly raised: boolean;
 }
 
+/** Le niveau visé à `remaining` jours d'une échéance de préavis `noticeDays`. */
+function target(
+  base: Importance,
+  remaining: number,
+  noticeDays: number,
+): Importance {
+  const ratio = remaining / noticeDays;
+
+  if (remaining <= 7 || ratio <= 0.1) {
+    return "critical";
+  }
+
+  if (ratio <= 0.5) {
+    return "important";
+  }
+
+  return base;
+}
+
 /**
  * L'importance d'une échéance ferme qui approche (SPEC § 3.8a, règle du
  * handoff de design) : dans la fenêtre de préavis, elle devient `important`
@@ -58,14 +77,7 @@ export function effectiveImportance({
     return { importance: base, raised: false };
   }
 
-  const ratio = remaining / noticeDays;
-  const target: Importance =
-    remaining <= 7 || ratio <= 0.1
-      ? "critical"
-      : ratio <= 0.5
-        ? "important"
-        : base;
-  const importance = highest(base, target);
+  const importance = highest(base, target(base, remaining, noticeDays));
 
   return { importance, raised: rank(importance) > rank(base) };
 }
