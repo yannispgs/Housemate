@@ -1,6 +1,6 @@
 {
   "$schema": "../../node_modules/wrangler/config-schema.json",
-  "name": "housemate-collecteur",
+  "name": "housemate-collector",
   "main": "src/index.ts",
   "compatibility_date": "2026-09-25",
   // Chaque heure pleine, en UTC. L'heure de Paris se calcule dans le code
