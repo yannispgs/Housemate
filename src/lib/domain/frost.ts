@@ -57,6 +57,18 @@ function round1(value: number): number {
   return Math.round(value * 10) / 10 + 0;
 }
 
+function extrapolationFor(exteriorMinimum: number): Extrapolation {
+  if (exteriorMinimum < VERANDA_MODEL.validFrom) {
+    return "low";
+  }
+
+  if (exteriorMinimum > VERANDA_MODEL.validTo) {
+    return "high";
+  }
+
+  return "none";
+}
+
 /** Le minimum de la véranda attendu cette nuit, avec sa marge. */
 export function predictVerandaMinimum({
   exteriorAt20h,
@@ -70,12 +82,7 @@ export function predictVerandaMinimum({
     VERANDA_MODEL.eveningLead * eveningLead +
     VERANDA_MODEL.exteriorDrop * exteriorDrop;
 
-  const extrapolation: Extrapolation =
-    forecastExteriorMinimum < VERANDA_MODEL.validFrom
-      ? "low"
-      : forecastExteriorMinimum > VERANDA_MODEL.validTo
-        ? "high"
-        : "none";
+  const extrapolation = extrapolationFor(forecastExteriorMinimum);
 
   return {
     estimate: round1(forecastExteriorMinimum + dawnLead),
