@@ -8,11 +8,14 @@
 # Runs in a throwaway schema and leaves nothing behind.
 set -euo pipefail
 
-readonly POOLED="postgres://neondb_owner:housemate-local@127.0.0.1:56432/neondb"
-readonly DIRECT="postgres://neondb_owner:housemate-local@127.0.0.1:55432/neondb"
+readonly POOLED="postgres://neondb_owner@127.0.0.1:56432/neondb"
+readonly DIRECT="postgres://neondb_owner@127.0.0.1:55432/neondb"
 
 psql_q() {
-  docker compose exec -T postgres psql "$1" -XAtq -v ON_ERROR_STOP=1 -c "$2"
+  local url="$1"
+  local sql="$2"
+
+  docker compose exec -T postgres psql "$url" -XAtq -v ON_ERROR_STOP=1 -c "$sql"
 }
 
 # Inside the container, the published ports are the internal ones.
@@ -26,7 +29,7 @@ fail() {
 
 echo "1. The app role is not a superuser"
 is_super=$(psql_q "$DIRECT_IN" "select rolsuper from pg_roles where rolname = current_user")
-[ "$is_super" = "f" ] || fail "neondb_owner is a superuser: RLS would be bypassed"
+[[ "$is_super" = "f" ]] || fail "neondb_owner is a superuser: RLS would be bypassed"
 echo "   ✅ neondb_owner is not a superuser"
 
 psql_q "$DIRECT_IN" "
@@ -49,7 +52,7 @@ seen=$(psql_q "$POOLED_IN" "
   select set_config('request.jwt.claims', '{\"sub\":\"alice\"}', true);
   select string_agg(owner, ',') from verify.notes;
   commit;" | tail -1)
-[ "$seen" = "alice" ] || fail "authenticated as alice saw '$seen'"
+[[ "$seen" = "alice" ]] || fail "authenticated as alice saw '$seen'"
 echo "   ✅ alice sees only her own row"
 
 anon=$(psql_q "$POOLED_IN" "
@@ -57,7 +60,7 @@ anon=$(psql_q "$POOLED_IN" "
   set local role anonymous;
   select count(*) from verify.notes;
   commit;" | tail -1)
-[ "$anon" = "0" ] || fail "anonymous saw $anon rows"
+[[ "$anon" = "0" ]] || fail "anonymous saw $anon rows"
 echo "   ✅ anonymous sees nothing (no policy grants it a row)"
 
 echo "3. The pooler is in transaction mode, hazard included"
@@ -69,7 +72,7 @@ echo "3. The pooler is in transaction mode, hazard included"
 psql_q "$POOLED_IN" \
   "select set_config('request.jwt.claims', '{\"sub\":\"alice\"}', false)" >/dev/null
 leak=$(psql_q "$POOLED_IN" "select coalesce(auth.user_id(), '<none>')")
-[ "$leak" = "alice" ] || fail "no leak between clients ('$leak'): the pooler is not in transaction mode"
+[[ "$leak" = "alice" ]] || fail "no leak between clients ('$leak'): the pooler is not in transaction mode"
 psql_q "$POOLED_IN" "reset all" >/dev/null
 echo "   ✅ a session-level claim leaks to the next client, as on Neon"
 
@@ -78,7 +81,7 @@ scoped=$(psql_q "$POOLED_IN" "
   select set_config('request.jwt.claims', '{\"sub\":\"alice\"}', true);
   commit;
   select coalesce(auth.user_id(), '<none>');" | tail -1)
-[ "$scoped" = "<none>" ] || fail "a transaction-scoped claim survived its transaction ('$scoped')"
+[[ "$scoped" = "<none>" ]] || fail "a transaction-scoped claim survived its transaction ('$scoped')"
 echo "   ✅ a transaction-scoped claim does not: that is the safe pattern"
 
 psql_q "$DIRECT_IN" "set client_min_messages = warning; drop schema verify cascade" >/dev/null

@@ -1,19 +1,21 @@
 # Local database for development, shaped like Neon (see docker/postgres).
 #
-# Both ports listen on 127.0.0.1 only: this machine is reachable from the
-# internet, and the password below is a local development value, not a secret.
+# Both ports listen on 127.0.0.1 only — this machine is reachable from the
+# internet — which is what allows local connections without any password.
+# There is no credential in this repository.
 #
-#   pooled (as the app connects on Neon)  postgres://neondb_owner:housemate-local@127.0.0.1:56432/neondb
-#   direct (migrations)                   postgres://neondb_owner:housemate-local@127.0.0.1:55432/neondb
+#   pooled (as the app connects on Neon)  postgres://neondb_owner@127.0.0.1:56432/neondb
+#   direct (migrations)                   postgres://neondb_owner@127.0.0.1:55432/neondb
 name: housemate
 
 services:
   postgres:
     build: docker/postgres
     environment:
-      # Superuser of the container only, used by the init scripts. The app never
-      # connects with it (docker/postgres/init/01-neon-roles.sql explains why).
-      POSTGRES_PASSWORD: housemate-local-superuser
+      # No password at all, for any role: the ports are bound to 127.0.0.1.
+      # What makes this database Neon-like — roles, RLS, the pooler — does not
+      # depend on how a local connection authenticates.
+      POSTGRES_HOST_AUTH_METHOD: trust
     ports:
       - "127.0.0.1:55432:5432"
     volumes:

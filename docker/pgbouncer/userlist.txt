@@ -1,1 +1,1 @@
-"neondb_owner" "housemate-local"
+"neondb_owner" ""

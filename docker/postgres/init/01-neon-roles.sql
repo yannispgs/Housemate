@@ -8,7 +8,7 @@
 
 -- Owner of the database and of every migrated object, like Neon's
 -- `neondb_owner`: can create roles and databases, but is not a superuser.
-CREATE ROLE neondb_owner LOGIN PASSWORD 'housemate-local' CREATEDB CREATEROLE;
+CREATE ROLE neondb_owner LOGIN CREATEDB CREATEROLE;
 
 -- The two request roles of Neon's Data API. Policies target them; they never
 -- log in directly.
