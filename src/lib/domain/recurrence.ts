@@ -28,6 +28,21 @@ export type Duration = {
 
 export class InvalidRecurrenceError extends Error {}
 
+/**
+ * Un décalage de dérivation peut être négatif (SPEC § 3.4a) : les échéances les
+ * plus coûteuses se calculent à l'envers, depuis une date qu'on ne choisit pas
+ * — un passeport six mois avant son expiration, un contrat un mois avant sa
+ * date anniversaire. Sans cela, l'échéance tomberait au moment précis où il
+ * est trop tard pour agir. Seule exigence : un nombre entier.
+ */
+function assertWholeOffset(duration: Duration): void {
+  if (!Number.isInteger(duration.count)) {
+    throw new InvalidRecurrenceError(
+      `Un décalage est un nombre entier, reçu ${duration.count}.`,
+    );
+  }
+}
+
 function assertPositive(duration: Duration): void {
   if (!Number.isInteger(duration.count) || duration.count < 1) {
     throw new InvalidRecurrenceError(
@@ -93,7 +108,11 @@ export type SinceCompletionRecurrence = {
   readonly after: Duration;
 };
 
-/** 5 — Dérivée d'un attribut de fiche : date d'achat + durée de garantie. */
+/**
+ * 5 — Dérivée d'un attribut de fiche : date d'achat + durée de garantie, ou
+ * expiration − 6 mois. Le décalage est **négatif** quand l'échéance précède sa
+ * source.
+ */
 export type DerivedRecurrence = {
   readonly kind: "derived";
   readonly sourceDate: PlainDate;
@@ -372,7 +391,7 @@ export function nextOccurrence(
     }
 
     case "derived": {
-      assertPositive(recurrence.offset);
+      assertWholeOffset(recurrence.offset);
       const due = addDuration(recurrence.sourceDate, recurrence.offset, 1);
       return notBefore(due, from) ? due : null;
     }

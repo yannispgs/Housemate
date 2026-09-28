@@ -260,6 +260,53 @@ describe("5 — dérivée d'un attribut", () => {
   it("ne rend plus rien une fois passée", () => {
     expect(next(finDeGarantie, "2027-03-13")).toBeNull();
   });
+
+  it("⚠️ accepte un décalage négatif : le passeport six mois avant expiration", () => {
+    const renouvelerPasseport: ScheduledRecurrence = {
+      kind: "derived",
+      sourceDate: d("2027-08-31"),
+      offset: { count: -6, unit: "month" },
+    };
+
+    // Le 31 rabattu sur le dernier jour de février.
+    expect(next(renouvelerPasseport, "2026-09-28")).toBe("2027-02-28");
+  });
+
+  it("accepte un décalage négatif en jours : un mois avant la date anniversaire", () => {
+    const resilier: ScheduledRecurrence = {
+      kind: "derived",
+      sourceDate: d("2027-01-15"),
+      offset: { count: -30, unit: "day" },
+    };
+
+    expect(next(resilier, "2026-09-28")).toBe("2026-12-16");
+  });
+
+  it("accepte un décalage nul : l'échéance tombe le jour même", () => {
+    expect(
+      next(
+        {
+          kind: "derived",
+          sourceDate: d("2027-01-15"),
+          offset: { count: 0, unit: "day" },
+        },
+        "2026-09-28",
+      ),
+    ).toBe("2027-01-15");
+  });
+
+  it("refuse un décalage non entier", () => {
+    expect(() =>
+      next(
+        {
+          kind: "derived",
+          sourceDate: d("2027-01-15"),
+          offset: { count: 1.5, unit: "month" },
+        },
+        "2026-09-28",
+      ),
+    ).toThrow(/nombre entier/);
+  });
 });
 
 describe("6 — ponctuelle", () => {
