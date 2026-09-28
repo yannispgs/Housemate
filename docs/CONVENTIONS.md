@@ -225,13 +225,16 @@ only the adapter changes.
   deploy per PR, production on `main`).
 - **Functions region**: `fra1` (Frankfurt), next to Neon — set in `vercel.json`,
   versioned. The default `iad1` would cost a transatlantic round trip per query.
-- **Domain**: ⚠️ **HouseMate — `house-mate.app`**, production at the apex, for
-  its first year (a shared household domain for every tool is to be decided at
-  renewal). `.app` makes browsers enforce HTTPS on every subdomain.
+- **Domain**: ⚠️ **HouseMate — `house-mate.app`**, for its first year (a shared
+  household domain for every tool is to be decided at renewal). Production is
+  **`www.house-mate.app`**; the apex redirects to it (308, set in Vercel). Do
+  not move it once the web app is installed: a PWA is bound to its exact origin.
+  `.app` makes browsers enforce HTTPS on every subdomain.
 - **Per-PR preview**: `https://pr-<number>.preview.house-mate.app`. Previews
   get **their own sub-level** so the shared cookie below never reaches
-  production. DNS stays at Cloudflare in **DNS-only** mode (grey cloud): the
-  apex points to Vercel, plus **one wildcard CNAME** (`*.preview` → Vercel).
+  production. DNS stays at Cloudflare in **DNS-only** mode (grey cloud): `www`
+  and the apex point to Vercel, plus **one wildcard CNAME** (`*.preview` →
+  Vercel).
   Cloudflare's free proxy certificate covers a single level, so proxied previews
   would fail TLS; Vercel issues one certificate per preview.
   The domain is attached to the PR branch when the PR opens and removed when it
@@ -249,8 +252,9 @@ only the adapter changes.
 - **Shared preview session**: the auth cookie is scoped to
   `.preview.house-mate.app` on the **Preview** environment only, so one login
   serves every preview. Production and local keep host-only cookies. ⚠️ Never
-  `.house-mate.app`: Neon Auth uses the same cookie name in production and in
-  previews, so a preview session would overwrite the production one.
+  `.house-mate.app`, which `www` would receive too: Neon Auth uses the same
+  cookie name in production and in previews, so a preview session would
+  overwrite the production one.
 
 ## 11. Testing
 
@@ -397,5 +401,6 @@ server's.
   webhook failing closed, sessions across branches, EU-jurisdiction R2).
 - _2026-09-27_ — Previews: one Neon branch per PR from `seed`, at most **9
   remote branches** besides `main`, functions in `fra1` (§10).
-- _2026-09-28_ — Domain: `house-mate.app` for the first year; previews at
+- _2026-09-28_ — Domain: `house-mate.app` for the first year, production on
+  `www`; previews at
   `pr-<n>.preview.house-mate.app`, cookie scoped to that sub-level only (§10).
