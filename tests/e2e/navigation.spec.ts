@@ -67,8 +67,11 @@ test.describe("tenue technique", () => {
     });
     page.on("pageerror", error => errors.push(error.message));
 
-    await page.goto("/");
-    await page.waitForLoadState("networkidle");
+    await page.goto("/", { waitUntil: "load" });
+    // Hydratée : la navigation est un composant client.
+    await expect(
+      page.getByRole("navigation", { name: "Navigation principale" }),
+    ).toBeVisible();
 
     expect(errors).toEqual([]);
   });
@@ -95,8 +98,12 @@ test.describe("tenue technique", () => {
       }
     });
 
-    await page.goto("/");
-    await page.waitForLoadState("networkidle");
+    await page.goto("/", { waitUntil: "load" });
+    // Attendre que les polices soient réellement chargées : ce sont elles
+    // qu'un CDN aurait servies.
+    await page.evaluate(async () => {
+      await document.fonts.ready;
+    });
 
     expect(external).toEqual([]);
   });
