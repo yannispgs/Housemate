@@ -5,13 +5,25 @@
 # binaries, so it is compiled here with pgrx and only the built files are copied
 # into the final image.
 
+#
+# Every image is pinned to an exact version AND to its multi-architecture index
+# digest, like every GitHub Action: a tag can be repointed, a digest cannot.
+#
+# Debian, not Alpine, for both stages: the extension is compiled against glibc
+# and must run on the glibc it was built with, and pgrx does not reliably
+# support musl. Both stages therefore share the same Debian release (trixie),
+# and the builder is the `slim` variant.
+
 ARG PG_MAJOR=18
 
-FROM rust:1-bookworm AS build
+FROM rust:1.98.1-slim-trixie@sha256:4cd829461bd5c4d511c32e269da9cb8929223b666519d8004e35fc8d1d771ab7 AS build
 ARG PGRX_VERSION=0.16.1
 
+# What the slim image leaves out and the build needs: git (fetching the
+# extension), pkg-config + libssl-dev (cargo-pgrx), clang (bindgen).
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends ca-certificates curl gnupg libclang-dev clang \
+  && apt-get install -y --no-install-recommends \
+    ca-certificates curl gnupg git pkg-config libssl-dev libclang-dev clang \
   && rm -rf /var/lib/apt/lists/*
 
 # The slowest step, and independent of the Postgres version: kept before it so
@@ -23,7 +35,7 @@ ARG PG_MAJOR
 RUN install -d /usr/share/postgresql-common/pgdg \
   && curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
     https://www.postgresql.org/media/keys/ACCC4CF8.asc \
-  && echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt bookworm-pgdg main" \
+  && echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt trixie-pgdg main" \
     > /etc/apt/sources.list.d/pgdg.list \
   && apt-get update \
   && apt-get install -y --no-install-recommends "postgresql-server-dev-${PG_MAJOR}" \
@@ -40,7 +52,8 @@ RUN git init -q . \
   && cargo pgrx package --no-default-features --features "pg${PG_MAJOR}" \
     --pg-config "/usr/lib/postgresql/${PG_MAJOR}/bin/pg_config"
 
-FROM postgres:${PG_MAJOR}-bookworm
+# The same major as the Neon projects.
+FROM postgres:18.6-trixie@sha256:5a5a84b19854a9ffaa54082c166ff4ec27473a361e496e5ea167f298f2da9722
 ARG PG_MAJOR
 COPY --from=build /src/target/release/pg_session_jwt-pg${PG_MAJOR}/usr/ /usr/
 COPY init/ /docker-entrypoint-initdb.d/
