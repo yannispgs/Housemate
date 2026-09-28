@@ -9,7 +9,7 @@ import { SEARCH_DESTINATION } from "@/lib/navigation";
  * Server component — rien ici ne dépend du navigateur. Seule `MainNav` est
  * cliente, parce qu'elle lit le chemin courant.
  */
-export function AppShell({ children }: { children: ReactNode }) {
+export function AppShell({ children }: Readonly<{ children: ReactNode }>) {
   return (
     <div className="min-h-dvh md:grid md:grid-cols-[14rem_1fr]">
       <MainNav />

@@ -174,6 +174,14 @@ function notBefore(candidate: PlainDate, from: PlainDate): boolean {
   return compare(candidate, from) >= 0;
 }
 
+/** Longueur approchée d'une unité, pour une première estimation seulement. */
+const APPROXIMATE_DAYS: Readonly<Record<DurationUnit, number>> = {
+  day: 1,
+  week: 7,
+  month: 30,
+  year: 365,
+};
+
 /** Nombre de répétitions à partir duquel l'intervalle atteint `from`. */
 function firstRepetitionAtOrAfter(
   anchor: PlainDate,
@@ -185,14 +193,7 @@ function firstRepetitionAtOrAfter(
   }
   // Estimation grossière puis correction bornée : les mois n'ont pas tous la
   // même longueur, donc on ne peut pas diviser exactement.
-  const perRepetitionDays =
-    every.unit === "day"
-      ? every.count
-      : every.unit === "week"
-        ? every.count * 7
-        : every.unit === "month"
-          ? every.count * 30
-          : every.count * 365;
+  const perRepetitionDays = every.count * APPROXIMATE_DAYS[every.unit];
   const rough = Math.max(
     0,
     Math.floor(

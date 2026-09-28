@@ -28,7 +28,7 @@ readonly POLL_ATTEMPTS=40 # 10 minutes
 status=$(curl -sS -o /dev/null -w '%{http_code}' \
   "$API/components/show?component=$PROJECT_KEY")
 
-if [ "$status" = "404" ]; then
+if [[ "$status" = "404" ]]; then
   echo "::warning::SonarCloud project $PROJECT_KEY does not exist yet — import the repository on sonarcloud.io. Issue check skipped."
   exit 0
 fi
@@ -46,7 +46,7 @@ for _ in $(seq "$POLL_ATTEMPTS"); do
         '.pullRequests[] | select(.key == $pr) | .commit.sha // ""'
   )
 
-  if [ "$analysed_sha" = "$HEAD_SHA" ]; then
+  if [[ "$analysed_sha" = "$HEAD_SHA" ]]; then
     break
   fi
 
@@ -54,7 +54,7 @@ for _ in $(seq "$POLL_ATTEMPTS"); do
   sleep "$POLL_INTERVAL"
 done
 
-if [ "$analysed_sha" != "$HEAD_SHA" ]; then
+if [[ "$analysed_sha" != "$HEAD_SHA" ]]; then
   # No analysis is not evidence of no issue, but it is not evidence of one
   # either — and a pull request touching only files Sonar has no analyser for
   # (Markdown, images) never gets one. Warn instead of blocking on it.
@@ -67,7 +67,7 @@ issues=$(
 )
 total=$(jq -r '.total' <<<"$issues")
 
-if [ "$total" -eq 0 ]; then
+if [[ "$total" -eq 0 ]]; then
   echo "SonarCloud reports no open issue on this pull request."
   exit 0
 fi
