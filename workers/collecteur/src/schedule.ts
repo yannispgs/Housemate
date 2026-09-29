@@ -50,3 +50,44 @@ export function shouldFetchTemperatureForecasts(hour: number): boolean {
 export function shouldFetchRainForecasts(hour: number): boolean {
   return hour === 22;
 }
+
+const PARIS_DATE = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "Europe/Paris",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
+/**
+ * La date de Paris à cet instant, en `AAAA-MM-JJ` (le format `en-CA`), décalée
+ * de `days` jours. Le décalage se fait à midi UTC : aucun changement d'heure ne
+ * peut alors faire sauter ou doubler un jour.
+ */
+export function parisDate(instant: Date, days = 0): string {
+  const today = PARIS_DATE.format(instant);
+  const noon = new Date(`${today}T12:00:00Z`);
+  noon.setUTCDate(noon.getUTCDate() + days);
+
+  return noon.toISOString().slice(0, 10);
+}
+
+/**
+ * La veille de gel se décide à 20 h (SPEC § 12.8), sur le relevé et les
+ * prévisions de la même heure.
+ */
+export function shouldEvaluateFrost(hour: number): boolean {
+  return hour === 20;
+}
+
+/**
+ * Le message de la nuit part à 20 h ; s'il a échoué, il est retenté chaque
+ * heure jusqu'à 23 h. Au-delà, chauffer n'aurait plus le temps de servir.
+ */
+export function shouldSendFrostMessage(hour: number): boolean {
+  return hour >= 20 && hour <= 23;
+}
+
+/** Le bilan de la nuit se fait sur le dernier relevé, celui de 9 h. */
+export function shouldReviewNight(hour: number): boolean {
+  return hour === 9;
+}
