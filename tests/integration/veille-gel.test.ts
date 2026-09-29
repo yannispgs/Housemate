@@ -178,9 +178,9 @@ describe("evaluateEvening", () => {
     await asWatch(sql => evaluateEvening(sql, NIGHT, EVENING));
     await asWatch(sql => evaluateEvening(sql, NIGHT, EVENING));
 
-    const [{ n }] = await owner`select count(*)::int as n from meteo.nuits_gel`;
+    const rows = await owner`select count(*)::int as n from meteo.nuits_gel`;
 
-    expect(n).toBe(1);
+    expect(rows[0]?.n).toBe(1);
   });
 });
 

@@ -106,7 +106,7 @@ export function base64Utf8(text: string): string {
   let binary = "";
 
   for (const byte of new TextEncoder().encode(text)) {
-    binary += String.fromCharCode(byte);
+    binary += String.fromCodePoint(byte);
   }
 
   return btoa(binary);
@@ -130,12 +130,10 @@ export async function deliver(
     await connection.startTls();
     // Tout ce qui a été annoncé avant TLS est oublié : on se présente à nouveau.
     await command(connection, "EHLO house-mate.app", "EHLO chiffré", 250);
-    await command(
-      connection,
-      `AUTH PLAIN ${base64Utf8(`\0${credentials.login}\0${credentials.key}`)}`,
-      "authentification",
-      235,
+    const plain = base64Utf8(
+      ["", credentials.login, credentials.key].join("\0"),
     );
+    await command(connection, `AUTH PLAIN ${plain}`, "authentification", 235);
     await command(
       connection,
       `MAIL FROM:<${envelope.from}>`,
@@ -168,14 +166,17 @@ function encodedWord(text: string): string {
   return /^[\x20-\x7e]*$/.test(text) ? text : `=?UTF-8?B?${base64Utf8(text)}?=`;
 }
 
+/** « Nom <adresse> » : seul le nom est encodé, l'adresse reste telle quelle. */
 function encodedAddress(address: string): string {
-  const match = /^(.*?)\s*<([^>]+)>$/.exec(address);
+  const open = address.lastIndexOf("<");
 
-  if (!match) {
+  if (open === -1 || !address.endsWith(">")) {
     return address;
   }
 
-  return `${encodedWord(match[1] ?? "")} <${match[2]}>`;
+  const name = address.slice(0, open).trim();
+
+  return `${encodedWord(name)} ${address.slice(open)}`;
 }
 
 /** Le message complet, en-têtes et corps, lignes terminées par CRLF. */

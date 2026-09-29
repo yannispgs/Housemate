@@ -19,31 +19,40 @@ export function openSmtp(hostname: string, port = 587): SmtpConnection {
   const parser = new ReplyReader();
   const ready: SmtpReply[] = [];
 
+  /** Lit le flux, morceau par morceau, jusqu'à tenir une réponse complète. */
+  async function reply(): Promise<SmtpReply> {
+    const next = ready.shift();
+
+    if (next !== undefined) {
+      return next;
+    }
+
+    const { value, done } = await reader.read();
+
+    if (done) {
+      throw new Error("SMTP : connexion fermée par le serveur.");
+    }
+
+    ready.push(...parser.push(decoder.decode(value, { stream: true })));
+
+    return reply();
+  }
+
   return {
     async send(line) {
       await writer.write(encoder.encode(`${line}\r\n`));
     },
 
-    async reply() {
-      while (ready.length === 0) {
-        const { value, done } = await reader.read();
+    reply,
 
-        if (done) {
-          throw new Error("SMTP : connexion fermée par le serveur.");
-        }
-
-        ready.push(...parser.push(decoder.decode(value, { stream: true })));
-      }
-
-      return ready.shift() as SmtpReply;
-    },
-
-    async startTls() {
+    startTls() {
       reader.releaseLock();
       writer.releaseLock();
       socket = socket.startTls();
       reader = socket.readable.getReader();
       writer = socket.writable.getWriter();
+
+      return Promise.resolve();
     },
 
     async close() {

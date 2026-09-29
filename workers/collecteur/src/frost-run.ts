@@ -180,11 +180,7 @@ export async function sendPending(
 export async function reviewNight(sql: Sql, night: string): Promise<void> {
   const entry = await nightToReview(sql, night);
 
-  if (
-    entry === null ||
-    entry.minExterior === null ||
-    entry.minVeranda === null
-  ) {
+  if (entry?.minExterior == null || entry.minVeranda === null) {
     return;
   }
 
