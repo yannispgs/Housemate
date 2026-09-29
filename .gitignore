@@ -51,3 +51,7 @@ next-env.d.ts
 /data/
 /design/brief-design-system.md
 /docs/REPRISE.md
+
+# configuration locale des Workers (secrets : coordonnées, jetons)
+.dev.vars*
+.wrangler/

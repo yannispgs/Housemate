@@ -1,0 +1,42 @@
+name: Deploy weather collector
+
+# Deploys the Cloudflare Worker in workers/collecteur/ on every merge to main
+# that touches it, so that what runs in production is always the reviewed code
+# — never something deployed by hand from a working copy.
+#
+# Code only. The Worker's secrets (database URL, SwitchBot credentials, the
+# household's coordinates) are set once with `wrangler secret put` from a
+# trusted machine and never pass through GitHub. Database migrations are not
+# applied here either: apply them before merging a change that needs them.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "workers/collecteur/**"
+      - ".github/workflows/deploy-collecteur.yml"
+  workflow_dispatch: {}
+
+# One deployment at a time; a newer merge waits instead of racing.
+concurrency:
+  group: deploy-collecteur
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy to Cloudflare Workers
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set up Node & dependencies
+        uses: ./.github/actions/setup
+      - name: Deploy
+        # The token is scoped to this one Worker with the Editor role: it can
+        # deploy and manage it, not create, delete or touch any other Worker.
+        run: yarn collecteur:deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
