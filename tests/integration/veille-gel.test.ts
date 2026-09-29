@@ -21,6 +21,7 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
+  await owner`delete from meteo.minima_prevus`;
   await owner`delete from meteo.nuits_gel`;
   await owner`delete from meteo.releves`;
   await owner`delete from meteo.previsions`;
@@ -62,7 +63,7 @@ async function journal() {
   const rows = await owner`
     select alerte, message, estimation::float8 as estimation,
       borne_basse::float8 as borne_basse, prevision_min::float8 as prevision_min,
-      prevision_modele, extrapolation, envoyee_le,
+      prevision_methode, extrapolation, envoyee_le,
       min_exterieur::float8 as min_exterieur, min_veranda::float8 as min_veranda,
       erreur_prevision::float8 as erreur_prevision,
       erreur_modele::float8 as erreur_modele
@@ -80,7 +81,7 @@ async function coldEvening() {
 }
 
 describe("evaluateEvening", () => {
-  it("retient le modèle le plus froid, dans la fenêtre de la nuit", async () => {
+  it("fait la moyenne des modèles, dans la fenêtre de la nuit", async () => {
     await coldEvening();
     // Hors fenêtre (10 h le 15) : ne compte pas, même plus froid.
     await forecast("arome", "2026-12-15T09:00:00Z", -9);
@@ -95,9 +96,44 @@ describe("evaluateEvening", () => {
     await asWatch(sql => evaluateEvening(sql, NIGHT, EVENING));
 
     const row = await journal();
+    const detail = await owner`
+      select modele, minimum::float8 as minimum, poids::float8 as poids
+      from meteo.minima_prevus where nuit = ${NIGHT} order by modele`;
 
-    expect(row?.prevision_min).toBe(-4);
-    expect(row?.prevision_modele).toBe("open-meteo/arome");
+    // Aucun modèle noté : moyenne simple de −4 et −2.
+    expect(row?.prevision_min).toBe(-3);
+    expect(row?.prevision_methode).toBe(
+      "moyenne simple de 2 modèles, pas encore notés",
+    );
+    expect(detail).toEqual([
+      { modele: "arome", minimum: -4, poids: 0.5 },
+      { modele: "icon_d2", minimum: -2, poids: 0.5 },
+    ]);
+  });
+
+  it("pondère par la fiabilité mesurée les nuits précédentes", async () => {
+    // Cinq nuits notées : AROME se trompe de 0,5 °C, ICON de 1 °C.
+    for (let day = 9; day <= 13; day += 1) {
+      const nuit = `2026-12-${day}`;
+      await owner`
+        insert into meteo.nuits_gel (nuit, seuil_degats, alerte, min_exterieur)
+        values (${nuit}, 0, false, 0)`;
+      await owner`
+        insert into meteo.minima_prevus (nuit, source, modele, minimum, poids)
+        values (${nuit}, 'open-meteo', 'arome', -0.5, 0.5),
+          (${nuit}, 'open-meteo', 'icon_d2', 1, 0.5)`;
+    }
+    await coldEvening();
+
+    await asWatch(sql => evaluateEvening(sql, NIGHT, EVENING));
+
+    const row = await journal();
+
+    // Poids 4 et 1 : 0,8 × −4 + 0,2 × −2 = −3,6.
+    expect(row?.prevision_min).toBe(-3.6);
+    expect(row?.prevision_methode).toBe(
+      "moyenne de 2 modèles sur 2, pondérée par leur fiabilité",
+    );
   });
 
   it("alerte sur le pire cas, et ouvre l'épisode", async () => {
@@ -107,12 +143,12 @@ describe("evaluateEvening", () => {
 
     const row = await journal();
 
-    // Δ_aube = 1,66 + 0,39 × 3 + 0,32 × 5 = 4,43 → −4 + 4,43 = 0,4 ;
-    // extrapolation (−4 < 0,3) : marge du modèle doublée à 2,2.
-    // Borne basse : 0,4 − 2,2 − 2 − 3 = −6,8.
-    expect(row?.estimation).toBe(0.4);
+    // Prévision retenue −3 (moyenne). Δ_aube = 1,66 + 0,39 × 3 + 0,32 × 4
+    // = 4,11 → −3 + 4,11 = 1,1 ; extrapolation (−3 < 0,3) : marge du modèle
+    // doublée à 2,2. Borne basse : 1,1 − 2,2 − 2 − 3 = −6,1.
+    expect(row?.estimation).toBe(1.1);
     expect(row?.extrapolation).toBe("low");
-    expect(row?.borne_basse).toBe(-6.8);
+    expect(row?.borne_basse).toBe(-6.1);
     expect(row?.alerte).toBe(true);
     expect(row?.message).toBe("alerte");
   });
@@ -243,7 +279,7 @@ describe("reviewNight", () => {
     await asWatch(sql => evaluateEvening(sql, NIGHT, EVENING));
     // Avant 20 h : hors de la nuit, même plus froid.
     await reading("exterieur", "2026-12-14T18:30:00Z", -10);
-    await reading("exterieur", "2026-12-15T05:01:00Z", -3);
+    await reading("exterieur", "2026-12-15T05:01:00Z", -2);
     await reading("veranda", "2026-12-15T06:01:00Z", 1.2);
     // Après 9 h 30 : le jour, hors de la nuit.
     await reading("veranda", "2026-12-15T10:01:00Z", -5);
@@ -252,13 +288,13 @@ describe("reviewNight", () => {
 
     const row = await journal();
 
-    // Prévision −4, mesuré −3 : la prévision était trop froide d'un degré.
-    // Modèle avec l'extérieur mesuré : Δ = 1,66 + 1,17 + 0,32 × 4 = 4,11,
-    // soit 1,1 prédit pour 1,2 mesuré.
-    expect(row?.min_exterieur).toBe(-3);
+    // Prévision −3, mesuré −2 : la moyenne était trop froide d'un degré.
+    // Modèle avec l'extérieur mesuré : Δ = 1,66 + 1,17 + 0,32 × 3 = 3,79,
+    // soit 1,8 prédit pour 1,2 mesuré.
+    expect(row?.min_exterieur).toBe(-2);
     expect(row?.min_veranda).toBe(1.2);
     expect(row?.erreur_prevision).toBe(1);
-    expect(row?.erreur_modele).toBe(0.1);
+    expect(row?.erreur_modele).toBe(-0.6);
   });
 
   it("ne fait pas de bilan quand le soir n'avait pas de quoi prédire", async () => {

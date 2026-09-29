@@ -16,17 +16,20 @@ import {
 } from "../../../src/lib/domain/frost";
 import {
   claimMessage,
+  type EveningEntry,
   eveningReadings,
   forecastMinima,
+  modelScores,
   nightToReview,
   type PendingMessage,
   previousNightAlerted,
   recordEvening,
+  recordModelMinima,
   recordReview,
   releaseMessage,
 } from "./frost-store";
 import {
-  coldestForecast,
+  blendForecasts,
   frostMail,
   type Mail,
   messageFor,
@@ -41,7 +44,10 @@ export async function evaluateEvening(
   now: Date,
 ): Promise<void> {
   const readings = await eveningReadings(sql, now);
-  const forecast = coldestForecast(await forecastMinima(sql, night, now));
+  const forecast = blendForecasts(
+    await forecastMinima(sql, night, now),
+    await modelScores(sql),
+  );
 
   if (forecast === null) {
     // Sans prévision, rien à décider ni à dire de sensé : l'échec doit se
@@ -51,17 +57,22 @@ export async function evaluateEvening(
     );
   }
 
+  // La ligne du soir d'abord, puis le détail par modèle qui s'y rattache.
+  const record = async (entry: EveningEntry) => {
+    await recordEvening(sql, entry);
+    await recordModelMinima(sql, night, forecast.models);
+  };
   const common = {
     night,
     exteriorAt20h: readings.exterieur,
     verandaAt20h: readings.veranda,
     forecastMinimum: forecast.minimum,
-    forecastModel: `${forecast.source}/${forecast.model}`,
+    forecastMethod: forecast.method,
     damageThreshold: VERANDA_WATCH.damageThreshold,
   };
 
   if (readings.exterieur === null || readings.veranda === null) {
-    await recordEvening(sql, {
+    await record({
       ...common,
       estimate: null,
       modelMargin: null,
@@ -92,7 +103,7 @@ export async function evaluateEvening(
   });
   const previous = await previousNightAlerted(sql, night);
 
-  await recordEvening(sql, {
+  await record({
     ...common,
     estimate: prediction.estimate,
     modelMargin: prediction.margin,
@@ -122,9 +133,8 @@ function missingSensors(pending: PendingMessage): string[] {
 /** Le mail d'une ligne du journal. */
 export function mailFor(pending: PendingMessage): Mail {
   const forecast = {
-    source: "",
-    model: pending.forecastModel,
     minimum: pending.forecastMinimum,
+    method: pending.forecastMethod,
   };
 
   if (

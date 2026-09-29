@@ -2,26 +2,92 @@ import { describe, expect, it } from "vitest";
 import { mailFor } from "./frost-run";
 import type { PendingMessage } from "./frost-store";
 import {
+  blendForecasts,
   celsius,
-  coldestForecast,
   frostMail,
   messageFor,
   undecidedMail,
 } from "./frost-watch";
 
-describe("coldestForecast", () => {
-  it("retient le modèle le plus froid", () => {
-    const coldest = coldestForecast([
-      { source: "open-meteo", model: "arome", minimum: -1.2 },
-      { source: "met-norway", model: "locationforecast", minimum: -2.4 },
-      { source: "open-meteo", model: "icon_d2", minimum: 0.5 },
+const tonight = [
+  { source: "open-meteo", model: "arome", minimum: -2 },
+  { source: "open-meteo", model: "icon_d2", minimum: -1 },
+  { source: "met-norway", model: "locationforecast", minimum: 1 },
+];
+
+const scored = (model: string, rmse: number, nights = 20) => ({
+  source: model === "locationforecast" ? "met-norway" : "open-meteo",
+  model,
+  nights,
+  rmse,
+});
+
+describe("blendForecasts", () => {
+  it("fait une moyenne simple tant qu'aucun modèle n'est noté", () => {
+    const blend = blendForecasts(tonight, [scored("arome", 0.5, 4)]);
+
+    expect(blend?.minimum).toBe(-0.7);
+    expect(blend?.method).toBe("moyenne simple de 3 modèles, pas encore notés");
+    expect(blend?.models.map(entry => entry.weight)).toEqual([
+      1 / 3,
+      1 / 3,
+      1 / 3,
+    ]);
+  });
+
+  it("donne plus de poids aux modèles fiables", () => {
+    // Erreurs 0,5 et 1 : poids 4 et 1, soit 80 % et 20 %.
+    const blend = blendForecasts(tonight.slice(0, 2), [
+      scored("arome", 0.5),
+      scored("icon_d2", 1),
     ]);
 
-    expect(coldest?.model).toBe("locationforecast");
+    expect(blend?.models.map(entry => entry.weight)).toEqual([0.8, 0.2]);
+    expect(blend?.minimum).toBe(-1.8);
+    expect(blend?.method).toBe(
+      "moyenne de 2 modèles sur 2, pondérée par leur fiabilité",
+    );
+  });
+
+  it("écarte un modèle plus de deux fois moins fiable que le meilleur", () => {
+    const blend = blendForecasts(tonight, [
+      scored("arome", 0.5),
+      scored("icon_d2", 0.8),
+      scored("locationforecast", 1.2),
+    ]);
+
+    expect(blend?.models[2]?.weight).toBe(0);
+    expect(blend?.method).toBe(
+      "moyenne de 2 modèles sur 3, pondérée par leur fiabilité",
+    );
+  });
+
+  it("ne laisse pas un modèle chanceux écraser les autres", () => {
+    // Une erreur de 0,05 sur quelques nuits est ramenée au plancher de 0,3.
+    const blend = blendForecasts(tonight.slice(0, 2), [
+      scored("arome", 0.05),
+      scored("icon_d2", 0.6),
+    ]);
+
+    expect(blend?.models[0]?.weight).toBeCloseTo(0.8);
+  });
+
+  it("fait peser un modèle pas encore noté comme un modèle moyen", () => {
+    const blend = blendForecasts(tonight, [
+      scored("arome", 0.5),
+      scored("icon_d2", 1),
+    ]);
+
+    // Poids bruts 4, 1, et la médiane des deux, 2,5.
+    expect(blend?.models.map(entry => entry.weight)).toEqual([
+      4 / 7.5,
+      1 / 7.5,
+      2.5 / 7.5,
+    ]);
   });
 
   it("ne retient rien sans prévision", () => {
-    expect(coldestForecast([])).toBeNull();
+    expect(blendForecasts([], [])).toBeNull();
   });
 });
 
@@ -47,7 +113,7 @@ describe("celsius", () => {
 const facts = {
   exteriorAt20h: 1.5,
   verandaAt20h: 4.2,
-  forecast: { source: "open-meteo", model: "arome", minimum: -3 },
+  forecast: { minimum: -3, method: "moyenne de 5 modèles sur 5" },
   prediction: { estimate: 2.1, margin: 1.1, extrapolation: "low" as const },
   decision: { alert: true, lowerBound: -4, extrapolation: "low" as const },
 };
@@ -62,7 +128,7 @@ describe("frostMail", () => {
     expect(mail.text).toContain("Chauffer ce soir.");
     expect(mail.text).toContain("Minimum attendu dans la véranda : 2,1 °C");
     expect(mail.text).toContain("Pire cas retenu : −4,0 °C");
-    expect(mail.text).toContain("−3,0 °C (arome, le plus froid des modèles)");
+    expect(mail.text).toContain("−3,0 °C (moyenne de 5 modèles sur 5)");
     expect(mail.text).toContain("marge est doublée");
   });
 
@@ -95,7 +161,7 @@ describe("mailFor", () => {
     exteriorAt20h: 1.5,
     verandaAt20h: 4.2,
     forecastMinimum: -3,
-    forecastModel: "open-meteo/arome",
+    forecastMethod: "moyenne simple de 5 modèles, pas encore notés",
     estimate: 2.1,
     modelMargin: 1.1,
     lowerBound: -4,

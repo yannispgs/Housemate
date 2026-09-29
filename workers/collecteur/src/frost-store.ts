@@ -7,7 +7,7 @@
  * Les bornes de la nuit se calculent EN BASE, à l'heure de Paris : « de 20 h à
  * 9 h » garde son sens les nuits de changement d'heure.
  */
-import type { ModelMinimum } from "./frost-watch";
+import type { ModelMinimum, ModelScore, WeightedModel } from "./frost-watch";
 import type { Sql } from "./store";
 
 async function rows<T>(query: Promise<unknown>): Promise<T[]> {
@@ -62,6 +62,33 @@ export async function forecastMinima(
   `);
 }
 
+/** La note de chaque modèle sur les nuits passées. */
+export async function modelScores(sql: Sql): Promise<ModelScore[]> {
+  return rows<ModelScore>(sql`
+    select source, modele as model, nuits as nights, rmse::float8 as rmse
+    from meteo.fiabilite_modeles
+  `);
+}
+
+/** Le minimum de chaque modèle ce soir, et son poids dans la moyenne. */
+export async function recordModelMinima(
+  sql: Sql,
+  night: string,
+  models: readonly WeightedModel[],
+): Promise<void> {
+  await sql`
+    insert into meteo.minima_prevus (nuit, source, modele, minimum, poids)
+    select ${night}::date, source, modele, minimum, poids
+    from unnest(
+      ${models.map(entry => entry.source)}::text[],
+      ${models.map(entry => entry.model)}::text[],
+      ${models.map(entry => entry.minimum)}::numeric[],
+      ${models.map(entry => Math.round(entry.weight * 10_000) / 10_000)}::numeric[]
+    ) as m(source, modele, minimum, poids)
+    on conflict do nothing
+  `;
+}
+
 export async function previousNightAlerted(
   sql: Sql,
   night: string,
@@ -78,7 +105,7 @@ export interface EveningEntry {
   readonly exteriorAt20h: number | null;
   readonly verandaAt20h: number | null;
   readonly forecastMinimum: number | null;
-  readonly forecastModel: string | null;
+  readonly forecastMethod: string | null;
   readonly estimate: number | null;
   readonly modelMargin: number | null;
   readonly forecastMargin: number | null;
@@ -100,12 +127,12 @@ export async function recordEvening(
 ): Promise<void> {
   await sql`
     insert into meteo.nuits_gel (
-      nuit, exterieur_20h, veranda_20h, prevision_min, prevision_modele,
+      nuit, exterieur_20h, veranda_20h, prevision_min, prevision_methode,
       estimation, marge_modele, marge_prevision, marge_radiative,
       seuil_degats, borne_basse, extrapolation, alerte, message
     ) values (
       ${entry.night}::date, ${entry.exteriorAt20h}, ${entry.verandaAt20h},
-      ${entry.forecastMinimum}, ${entry.forecastModel}, ${entry.estimate},
+      ${entry.forecastMinimum}, ${entry.forecastMethod}, ${entry.estimate},
       ${entry.modelMargin}, ${entry.forecastMargin}, ${entry.radiativeMargin},
       ${entry.damageThreshold}, ${entry.lowerBound}, ${entry.extrapolation},
       ${entry.alert}, ${entry.message}
@@ -120,7 +147,7 @@ export interface PendingMessage {
   readonly exteriorAt20h: number | null;
   readonly verandaAt20h: number | null;
   readonly forecastMinimum: number;
-  readonly forecastModel: string;
+  readonly forecastMethod: string;
   readonly estimate: number | null;
   readonly modelMargin: number | null;
   readonly lowerBound: number | null;
@@ -144,7 +171,7 @@ export async function claimMessage(
       exterieur_20h::float8 as "exteriorAt20h",
       veranda_20h::float8 as "verandaAt20h",
       prevision_min::float8 as "forecastMinimum",
-      prevision_modele as "forecastModel",
+      prevision_methode as "forecastMethod",
       estimation::float8 as estimate,
       marge_modele::float8 as "modelMargin",
       borne_basse::float8 as "lowerBound",
