@@ -23,6 +23,10 @@ describe("construction", () => {
     expect(() => plainDate(2026, 13, 1)).toThrow(InvalidDateError);
   });
 
+  it("refuse une année non entière", () => {
+    expect(() => plainDate(2026.5, 1, 1)).toThrow(/Année invalide/);
+  });
+
   it("refuse un jour qui n'existe pas dans le mois", () => {
     expect(() => plainDate(2026, 2, 29)).toThrow(InvalidDateError);
     expect(() => plainDate(2026, 4, 31)).toThrow(InvalidDateError);

@@ -32,6 +32,7 @@ export function daysInMonth(year: number, month: Month): number {
   if (month === 2 && isLeapYear(year)) {
     return 29;
   }
+  /* c8 ignore next -- repli inatteignable : `Month` est borné à 1..12. */
   return DAYS_IN_MONTH[month - 1] ?? 30;
 }
 

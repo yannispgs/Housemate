@@ -1,4 +1,4 @@
-import { isMonth, MONTHS, type Month, nextMonth } from "@/lib/domain/month";
+import { MONTHS, type Month, nextMonth } from "@/lib/domain/month";
 
 /**
  * Masque de douze mois — la structure signature du produit.
@@ -76,6 +76,7 @@ export function maskFromRange(from: Month, to: Month): MonthMask {
 }
 
 export function isActiveIn(mask: MonthMask, month: Month): boolean {
+  /* c8 ignore next -- repli inatteignable : un masque a toujours douze mois. */
   return mask[month - 1] ?? false;
 }
 
@@ -169,12 +170,8 @@ export function fromSerialised(input: SerialisedMask): MonthMask {
   }
   for (const [index, value] of input.entries()) {
     if (value !== 0 && value !== 1) {
-      const month = index + 1;
-      if (!isMonth(month)) {
-        throw new InvalidMaskError(`Mois hors bornes : ${month}.`);
-      }
       throw new InvalidMaskError(
-        `Valeur ${value} au mois ${month} : seuls 0 et 1 sont admis.`,
+        `Valeur ${value} au mois ${index + 1} : seuls 0 et 1 sont admis.`,
       );
     }
   }

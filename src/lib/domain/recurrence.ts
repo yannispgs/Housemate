@@ -285,6 +285,7 @@ function seasonStart(
       return firstOfMonth(cursor, startDay);
     }
   }
+  /* c8 ignore next -- inatteignable : une saison vide est écartée avant tout appel (`nextSeasonal`). Gardé pour qu'une boucle ne rende jamais une date fausse. */
   throw new InvalidRecurrenceError("Saison sans mois actif.");
 }
 
@@ -331,6 +332,7 @@ function nextSeasonal(
     }
     entry = nextSeasonStart(recurrence.season, recurrence.startDay, entry);
   }
+  /* c8 ignore next -- inatteignable : chaque saison non vide produit une date. Borne de sûreté contre une boucle infinie. */
   return null;
 }
 
