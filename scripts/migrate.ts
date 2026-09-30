@@ -3,6 +3,10 @@
  *
  *   MIGRATION_DATABASE_URL=… yarn db:migrate
  *
+ * Code de sortie : 0 si la base est à jour, 1 sur une erreur (SQL, connexion),
+ * 2 si l'historique de la base contredit les fichiers (migration modifiée,
+ * disparue ou antérieure à la dernière appliquée).
+ *
  * ⚠️ Connexion DIRECTE, jamais par le pool : le verrou consultatif qui empêche
  * deux exécutions simultanées vit dans la session, et un pool en mode
  * transaction le perdrait entre deux requêtes (docker/verify.sh, point 3).
@@ -63,7 +67,10 @@ try {
     for (const error of plan.errors) {
       console.error(`✗ ${error}`);
     }
-    process.exitCode = 1;
+    // Code distinct : l'historique de la base ne correspond plus aux fichiers.
+    // Une preview y répond en repartant de `seed` ; une erreur SQL (code 1)
+    // doit, elle, faire échouer (action `preview-migrate`).
+    process.exitCode = 2;
   } else if (plan.pending.length === 0) {
     console.log("Base à jour, aucune migration à appliquer.");
   } else {

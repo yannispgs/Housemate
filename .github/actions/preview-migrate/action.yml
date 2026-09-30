@@ -1,0 +1,63 @@
+name: Migrate a Neon branch
+description: >-
+  Applies the repository's migrations to a branch of the `housemate-previews`
+  project. With `reset-from`, a branch whose history contradicts the files (a
+  migration rewritten during review, renumbered after a rebase) starts over
+  from that branch instead of failing.
+  Expects the repository checked out and its dependencies installed.
+
+inputs:
+  branch-id:
+    description: The Neon branch to migrate.
+    required: true
+  reset-from:
+    description: >-
+      Branch id to restore from when the history diverges (exit code 2 of
+      scripts/migrate.ts). Empty: a divergence fails, as it must for `seed`.
+    required: false
+    default: ""
+  api-key:
+    description: Neon API key.
+    required: true
+  project:
+    description: Neon project id.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        BRANCH_ID: ${{ inputs.branch-id }}
+        RESET_FROM: ${{ inputs.reset-from }}
+        NEON_KEY: ${{ inputs.api-key }}
+        PROJECT: ${{ inputs.project }}
+      run: |
+        set -euo pipefail
+        api="https://console.neon.tech/api/v2/projects/${PROJECT}"
+        neon() { curl -sSf -H "Authorization: Bearer ${NEON_KEY}" -H "Content-Type: application/json" "$@"; }
+        # Direct connection: the migration lock lives in the session, which a
+        # transaction-mode pool would lose (scripts/migrate.ts).
+        uri=$(neon "${api}/connection_uri?branch_id=${BRANCH_ID}&database_name=housemate-previews&role_name=housemate-previews_owner" | jq -r .uri)
+        echo "::add-mask::${uri}"
+
+        status=0
+        MIGRATION_DATABASE_URL="$uri" yarn db:migrate || status=$?
+
+        if [ "$status" = 2 ] && [ -n "$RESET_FROM" ]; then
+          echo "::warning::migration history diverged: resetting the database from its parent"
+          neon -o /dev/null -X POST "${api}/branches/${BRANCH_ID}/restore" \
+            -d "$(jq -n --arg s "$RESET_FROM" '{source_branch_id: $s}')"
+
+          for _ in $(seq 1 30); do
+            if [ "$(neon "${api}/branches/${BRANCH_ID}" | jq -r .branch.current_state)" = ready ]; then
+              break
+            fi
+
+            sleep 2
+          done
+
+          MIGRATION_DATABASE_URL="$uri" yarn db:migrate
+        elif [ "$status" != 0 ]; then
+          exit "$status"
+        fi

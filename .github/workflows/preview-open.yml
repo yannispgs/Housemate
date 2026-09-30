@@ -1,0 +1,78 @@
+name: Preview — open
+
+# Gives a PR its own preview, and keeps it complete:
+#   - a database: Neon branch `preview/pr-<n>`, copied from `seed`, with the
+#     PR's migrations applied;
+#   - an address: https://pr-<n>.preview.house-mate.app, a Vercel domain linked
+#     to the PR's Git branch, so Vercel serves every push there by itself;
+#   - the link between the two: a `DATABASE_URL` variable scoped to that Git
+#     branch alone.
+# Every pass (opening, push, reopening) creates whichever is missing: a PR
+# opened before this workflow existed gets its full preview on its next push.
+# Removal: preview-close.yml. Keeping `seed` current: seed-update.yml.
+#
+# Why not the Neon <-> Vercel integration: it creates a Neon branch for every
+# branch Vercel builds, PR or not, within a free quota of ten.
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+
+# ⚠️ Same group as preview-close.yml: a close queues behind an open still
+# creating, and deletes only once it is done. Never cancelled, so nothing is
+# left half-created.
+concurrency:
+  group: preview-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  open:
+    name: Database, variable and address
+    # Secrets are withheld from forks; this repository takes no fork PRs. The
+    # release PR has no preview: Vercel skips its build (vercel.json), and a
+    # database for it would only use up one of the ten Neon branches.
+    # ⚠️ This cannot move to `on.pull_request.branches`: for pull requests, that
+    # filter (negations included) matches the TARGET branch, which is `main`
+    # for the release PR as for every other. No trigger filter sees the head
+    # branch, hence this condition.
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository
+      && !startsWith(github.event.pull_request.head.ref, 'release-please--')
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: ./.github/actions/setup
+
+      - id: branch
+        uses: ./.github/actions/neon-preview-branch
+        with:
+          operation: create
+          name: preview/pr-${{ github.event.pull_request.number }}
+          api-key: ${{ secrets.NEON_API_KEY }}
+          project: ${{ vars.NEON_PROJECT_ID }}
+
+      - uses: ./.github/actions/preview-migrate
+        with:
+          branch-id: ${{ steps.branch.outputs.id }}
+          reset-from: ${{ steps.branch.outputs.seed-id }}
+          api-key: ${{ secrets.NEON_API_KEY }}
+          project: ${{ vars.NEON_PROJECT_ID }}
+
+      - uses: ./.github/actions/vercel-preview
+        with:
+          operation: attach
+          pr-number: ${{ github.event.pull_request.number }}
+          git-branch: ${{ github.event.pull_request.head.ref }}
+          token: ${{ secrets.VERCEL_API_TOKEN }}
+          team: ${{ vars.VERCEL_TEAM_ID }}
+          project: ${{ vars.VERCEL_PROJECT_ID }}
+          preview-domain: ${{ vars.PREVIEW_BASE_DOMAIN }}
+          neon-api-key: ${{ secrets.NEON_API_KEY }}
+          neon-project: ${{ vars.NEON_PROJECT_ID }}
+          neon-branch-id: ${{ steps.branch.outputs.id }}
+          repo-id: ${{ github.event.repository.id }}
+          head-sha: ${{ github.event.pull_request.head.sha }}

@@ -1,0 +1,41 @@
+name: Seed update
+
+# On every merge to main, `seed` — the Neon branch every preview is copied
+# from — receives the new migrations, so the next PR starts from an up-to-date
+# copy. A divergence fails here instead of resetting: `seed` has no parent to
+# start over from.
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: seed-update
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  seed:
+    name: Bring seed up to date with main
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: ./.github/actions/setup
+
+      # `seed` always exists: `create` finds it, logs so, and gives its id.
+      - id: seed
+        uses: ./.github/actions/neon-preview-branch
+        with:
+          operation: create
+          name: seed
+          api-key: ${{ secrets.NEON_API_KEY }}
+          project: ${{ vars.NEON_PROJECT_ID }}
+
+      - uses: ./.github/actions/preview-migrate
+        with:
+          branch-id: ${{ steps.seed.outputs.id }}
+          api-key: ${{ secrets.NEON_API_KEY }}
+          project: ${{ vars.NEON_PROJECT_ID }}
