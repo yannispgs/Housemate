@@ -1,0 +1,198 @@
+name: Vercel preview
+description: >-
+  `attach`: gives a PR's Git branch its database (a `DATABASE_URL` variable
+  scoped to that branch alone) and its address (pr-<n> on the preview domain),
+  creating whichever is missing, then rebuilds the preview if the variable is
+  new. `detach`: removes both. Every call is safe to repeat.
+
+inputs:
+  operation:
+    description: "`attach` or `detach`."
+    required: true
+  pr-number:
+    description: The PR number, which names the address.
+    required: true
+  git-branch:
+    description: The PR's head branch.
+    required: true
+  token:
+    description: Vercel API token, limited to the `housemate` project.
+    required: true
+  team:
+    description: Vercel team id.
+    required: true
+  project:
+    description: Vercel project id.
+    required: true
+  preview-domain:
+    description: Parent domain of the previews, e.g. `preview.house-mate.app`.
+    required: true
+  neon-api-key:
+    description: Neon API key (attach only), to read the pooled connection.
+    required: false
+    default: ""
+  neon-project:
+    description: Neon project id (attach only).
+    required: false
+    default: ""
+  neon-branch-id:
+    description: The PR's Neon branch (attach only).
+    required: false
+    default: ""
+  repo-id:
+    description: GitHub repository id (attach only), for the rebuild.
+    required: false
+    default: ""
+  head-sha:
+    description: The commit to rebuild (attach only).
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - name: Variable DATABASE_URL for this branch only
+      id: env
+      if: inputs.operation == 'attach'
+      shell: bash
+      env:
+        VERCEL_TOKEN: ${{ inputs.token }}
+        TEAM: ${{ inputs.team }}
+        PROJECT: ${{ inputs.project }}
+        GIT_BRANCH: ${{ inputs.git-branch }}
+        NEON_KEY: ${{ inputs.neon-api-key }}
+        NEON_PROJECT: ${{ inputs.neon-project }}
+        NEON_BRANCH: ${{ inputs.neon-branch-id }}
+      run: |
+        set -euo pipefail
+        auth="Authorization: Bearer ${VERCEL_TOKEN}"
+        existing=$(curl -sSf -H "$auth" \
+          "https://api.vercel.com/v10/projects/${PROJECT}/env?gitBranch=${GIT_BRANCH}&teamId=${TEAM}" \
+          | jq -r --arg b "$GIT_BRANCH" '[.envs[] | select(.key == "DATABASE_URL" and .gitBranch == $b)] | length')
+
+        if [ "$existing" != 0 ]; then
+          echo "DATABASE_URL already set for ${GIT_BRANCH}"
+          echo "created=false" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+
+        # The app queries through the pool; only migrations need the direct
+        # connection.
+        uri=$(curl -sSf -H "Authorization: Bearer ${NEON_KEY}" \
+          "https://console.neon.tech/api/v2/projects/${NEON_PROJECT}/connection_uri?branch_id=${NEON_BRANCH}&database_name=housemate-previews&role_name=housemate-previews_owner&pooled=true" \
+          | jq -r .uri)
+        echo "::add-mask::${uri}"
+        curl -sSf -o /dev/null -X POST \
+          "https://api.vercel.com/v10/projects/${PROJECT}/env?upsert=true&teamId=${TEAM}" \
+          -H "$auth" -H "Content-Type: application/json" \
+          -d "$(jq -n --arg v "$uri" --arg b "$GIT_BRANCH" '{
+            key: "DATABASE_URL", value: $v, type: "sensitive",
+            target: ["preview"], gitBranch: $b
+          }')"
+        echo "DATABASE_URL set for ${GIT_BRANCH}"
+        echo "created=true" >> "$GITHUB_OUTPUT"
+
+    - name: Address pr-<n> on the preview domain
+      if: inputs.operation == 'attach'
+      shell: bash
+      env:
+        VERCEL_TOKEN: ${{ inputs.token }}
+        TEAM: ${{ inputs.team }}
+        PROJECT: ${{ inputs.project }}
+        GIT_BRANCH: ${{ inputs.git-branch }}
+        DOMAIN: pr-${{ inputs.pr-number }}.${{ inputs.preview-domain }}
+      run: |
+        set -euo pipefail
+        auth="Authorization: Bearer ${VERCEL_TOKEN}"
+        base="https://api.vercel.com"
+        code=$(curl -sS -o /tmp/domain.json -w '%{http_code}' -H "$auth" \
+          "${base}/v9/projects/${PROJECT}/domains/${DOMAIN}?teamId=${TEAM}")
+
+        case "$code" in
+          200)
+            if [ "$(jq -r '.gitBranch // empty' /tmp/domain.json)" = "$GIT_BRANCH" ]; then
+              echo "${DOMAIN} already serves ${GIT_BRANCH}"
+            else
+              # Pointing elsewhere (a reopened PR, a renamed branch): re-point.
+              curl -sSf -o /dev/null -X PATCH \
+                "${base}/v9/projects/${PROJECT}/domains/${DOMAIN}?teamId=${TEAM}" \
+                -H "$auth" -H "Content-Type: application/json" \
+                -d "$(jq -n --arg b "$GIT_BRANCH" '{gitBranch: $b}')"
+              echo "${DOMAIN} re-pointed to ${GIT_BRANCH}"
+            fi
+            ;;
+          404)
+            curl -sSf -o /dev/null -X POST \
+              "${base}/v10/projects/${PROJECT}/domains?teamId=${TEAM}" \
+              -H "$auth" -H "Content-Type: application/json" \
+              -d "$(jq -n --arg n "$DOMAIN" --arg b "$GIT_BRANCH" '{name: $n, gitBranch: $b}')"
+            echo "Created ${DOMAIN} → ${GIT_BRANCH}"
+            ;;
+          *)
+            echo "::error::unexpected ${code} reading ${DOMAIN}"
+            cat /tmp/domain.json
+            exit 1
+            ;;
+        esac
+
+        echo "Preview: https://${DOMAIN}" >> "$GITHUB_STEP_SUMMARY"
+
+    - name: Rebuild, now that the variable exists
+      # Vercel fixes a deployment's variables when it builds: the build it
+      # started on this push predates a variable created just now. Once the
+      # variable exists, every later push builds with it.
+      if: inputs.operation == 'attach' && steps.env.outputs.created == 'true'
+      shell: bash
+      env:
+        VERCEL_TOKEN: ${{ inputs.token }}
+        TEAM: ${{ inputs.team }}
+        PROJECT: ${{ inputs.project }}
+        GIT_BRANCH: ${{ inputs.git-branch }}
+        REPO_ID: ${{ inputs.repo-id }}
+        HEAD_SHA: ${{ inputs.head-sha }}
+      run: |
+        set -euo pipefail
+        url=$(curl -sSf -X POST "https://api.vercel.com/v13/deployments?teamId=${TEAM}" \
+          -H "Authorization: Bearer ${VERCEL_TOKEN}" -H "Content-Type: application/json" \
+          -d "$(jq -n --arg p "$PROJECT" --arg r "$REPO_ID" --arg b "$GIT_BRANCH" --arg s "$HEAD_SHA" '{
+            name: "housemate", project: $p,
+            gitSource: {type: "github", repoId: $r, ref: $b, sha: $s}
+          }')" | jq -r .url)
+        echo "Rebuilding: https://${url}"
+
+    - name: Detach the address
+      if: inputs.operation == 'detach'
+      shell: bash
+      env:
+        VERCEL_TOKEN: ${{ inputs.token }}
+        TEAM: ${{ inputs.team }}
+        PROJECT: ${{ inputs.project }}
+        DOMAIN: pr-${{ inputs.pr-number }}.${{ inputs.preview-domain }}
+      run: |
+        set -euo pipefail
+        # Already gone (404) is the desired state.
+        code=$(curl -sS -o /dev/null -w '%{http_code}' -X DELETE \
+          "https://api.vercel.com/v9/projects/${PROJECT}/domains/${DOMAIN}?teamId=${TEAM}" \
+          -H "Authorization: Bearer ${VERCEL_TOKEN}")
+        echo "${DOMAIN}: HTTP ${code}"
+
+    - name: Remove the branch's variable
+      if: inputs.operation == 'detach'
+      shell: bash
+      env:
+        VERCEL_TOKEN: ${{ inputs.token }}
+        TEAM: ${{ inputs.team }}
+        PROJECT: ${{ inputs.project }}
+        GIT_BRANCH: ${{ inputs.git-branch }}
+      run: |
+        set -euo pipefail
+        auth="Authorization: Bearer ${VERCEL_TOKEN}"
+        ids=$(curl -sSf -H "$auth" \
+          "https://api.vercel.com/v10/projects/${PROJECT}/env?gitBranch=${GIT_BRANCH}&teamId=${TEAM}" \
+          | jq -r --arg b "$GIT_BRANCH" '.envs[] | select(.gitBranch == $b) | .id')
+
+        for id in $ids; do
+          curl -sSf -o /dev/null -X DELETE -H "$auth" \
+            "https://api.vercel.com/v9/projects/${PROJECT}/env/${id}?teamId=${TEAM}"
+          echo "Removed variable ${id}"
+        done

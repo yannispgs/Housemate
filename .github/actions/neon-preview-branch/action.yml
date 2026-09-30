@@ -1,0 +1,86 @@
+name: Neon preview branch
+description: >-
+  Ensures a Neon branch exists, copied from `seed` (never from prod: previews
+  run unreviewed code), and is ready; or deletes it. Branches are looked up by
+  name, so every call is safe to repeat.
+
+inputs:
+  operation:
+    description: "`ensure` or `delete`."
+    required: true
+  name:
+    description: Branch name, e.g. `preview/pr-14`.
+    required: true
+  api-key:
+    description: Neon API key.
+    required: true
+  project:
+    description: Neon project id (`housemate-previews`).
+    required: true
+
+outputs:
+  id:
+    description: The branch id (ensure only).
+    value: ${{ steps.run.outputs.id }}
+  seed-id:
+    description: The id of `seed`, its parent (ensure only).
+    value: ${{ steps.run.outputs.seed-id }}
+
+runs:
+  using: composite
+  steps:
+    - id: run
+      shell: bash
+      env:
+        OPERATION: ${{ inputs.operation }}
+        NAME: ${{ inputs.name }}
+        NEON_KEY: ${{ inputs.api-key }}
+        PROJECT: ${{ inputs.project }}
+      run: |
+        set -euo pipefail
+        api="https://console.neon.tech/api/v2/projects/${PROJECT}"
+        neon() { curl -sSf -H "Authorization: Bearer ${NEON_KEY}" -H "Content-Type: application/json" "$@"; }
+        branches=$(neon "${api}/branches")
+        id=$(jq -r --arg n "$NAME" '.branches[] | select(.name == $n) | .id' <<<"$branches")
+
+        if [ "$OPERATION" = delete ]; then
+          if [ -z "$id" ]; then
+            echo "${NAME} already absent"
+            exit 0
+          fi
+
+          neon -o /dev/null -X DELETE "${api}/branches/${id}"
+          echo "Deleted ${NAME} (${id})"
+          exit 0
+        fi
+
+        seed=$(jq -r '.branches[] | select(.name == "seed") | .id' <<<"$branches")
+
+        if [ -z "$seed" ]; then
+          echo "::error::no seed branch in the Neon project"
+          exit 1
+        fi
+
+        if [ -z "$id" ]; then
+          payload=$(jq -n --arg n "$NAME" --arg p "$seed" '{
+            branch: {name: $n, parent_id: $p},
+            endpoints: [{type: "read_write",
+              autoscaling_limit_min_cu: 0.25, autoscaling_limit_max_cu: 0.25}]
+          }')
+          id=$(neon -X POST "${api}/branches" -d "$payload" | jq -r .branch.id)
+          echo "Created ${NAME} (${id}) from seed"
+        else
+          echo "${NAME} already exists (${id})"
+        fi
+
+        # A new branch is usable once Neon reports it ready.
+        for _ in $(seq 1 30); do
+          if [ "$(neon "${api}/branches/${id}" | jq -r .branch.current_state)" = ready ]; then
+            break
+          fi
+
+          sleep 2
+        done
+
+        echo "id=${id}" >> "$GITHUB_OUTPUT"
+        echo "seed-id=${seed}" >> "$GITHUB_OUTPUT"

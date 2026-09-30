@@ -1,0 +1,43 @@
+name: Preview — close
+
+# Removes a PR's preview when it closes, merged or not: its address, its
+# variable, then its Neon branch. Each removal treats "already gone" as done.
+# Creation: preview-open.yml.
+
+on:
+  pull_request:
+    types: [closed]
+
+# ⚠️ Same group as preview-open.yml: this waits for an open still creating.
+concurrency:
+  group: preview-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  close:
+    name: Remove the preview
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    steps:
+      # Checked out only to reach the local actions.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: ./.github/actions/vercel-preview
+        with:
+          operation: detach
+          pr-number: ${{ github.event.pull_request.number }}
+          git-branch: ${{ github.event.pull_request.head.ref }}
+          token: ${{ secrets.VERCEL_API_TOKEN }}
+          team: ${{ vars.VERCEL_TEAM_ID }}
+          project: ${{ vars.VERCEL_PROJECT_ID }}
+          preview-domain: ${{ vars.PREVIEW_BASE_DOMAIN }}
+
+      - uses: ./.github/actions/neon-preview-branch
+        with:
+          operation: delete
+          name: preview/pr-${{ github.event.pull_request.number }}
+          api-key: ${{ secrets.NEON_API_KEY }}
+          project: ${{ vars.NEON_PROJECT_ID }}

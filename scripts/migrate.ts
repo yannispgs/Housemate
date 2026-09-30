@@ -69,7 +69,7 @@ try {
     }
     // Code distinct : l'historique de la base ne correspond plus aux fichiers.
     // Une preview y répond en repartant de `seed` ; une erreur SQL (code 1)
-    // doit, elle, faire échouer (workflow `preview.yml`).
+    // doit, elle, faire échouer (action `preview-migrate`).
     process.exitCode = 2;
   } else if (plan.pending.length === 0) {
     console.log("Base à jour, aucune migration à appliquer.");
