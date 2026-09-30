@@ -6,11 +6,14 @@ import {
 
 // Ces parcours s'appuient sur la STRUCTURE — rôles, liens, `aria-current` —
 // plutôt que sur les libellés, qui changeront avec les écrans du design.
+//
+// L'étiquette `@critical` (option `tag`) désigne ceux qui bloquent chaque PR ;
+// les autres ne tournent qu'après la fusion (e2e-full.yml).
 
 test.describe("navigation", () => {
-  test("l'accueil s'affiche et se signale comme page courante @critical", async ({
-    page,
-  }) => {
+  test("l'accueil s'affiche et se signale comme page courante", {
+    tag: "@critical",
+  }, async ({ page }) => {
     await page.goto("/");
 
     const nav = page.getByRole("navigation", {
@@ -24,9 +27,9 @@ test.describe("navigation", () => {
     );
   });
 
-  test("chaque destination principale s'ouvre et devient courante @critical", async ({
-    page,
-  }) => {
+  test("chaque destination principale s'ouvre et devient courante", {
+    tag: "@critical",
+  }, async ({ page }) => {
     await page.goto("/");
 
     const nav = page.getByRole("navigation", {
@@ -55,9 +58,9 @@ test.describe("navigation", () => {
 });
 
 test.describe("tenue technique", () => {
-  test("l'accueil ne produit aucune erreur dans la console @critical", async ({
-    page,
-  }) => {
+  test("l'accueil ne produit aucune erreur dans la console", {
+    tag: "@critical",
+  }, async ({ page }) => {
     const errors: string[] = [];
 
     page.on("console", message => {
