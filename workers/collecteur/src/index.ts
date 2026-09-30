@@ -18,12 +18,20 @@ import {
   parseOpenMeteoRain,
   type RainPoint,
 } from "./forecasts";
+import { evaluateEvening, reviewNight, sendPending } from "./frost-run";
+import type { Mail } from "./frost-watch";
 import {
+  parisDate,
   parisHour,
+  shouldEvaluateFrost,
   shouldFetchRainForecasts,
   shouldFetchTemperatureForecasts,
   shouldReadSensors,
+  shouldReviewNight,
+  shouldSendFrostMessage,
 } from "./schedule";
+import { buildMessage, deliver } from "./smtp";
+import { openSmtp } from "./smtp-socket";
 import {
   insertForecasts,
   insertRainForecasts,
@@ -42,6 +50,52 @@ interface Env {
   SENSOR_VERANDA_ID: string;
   LATITUDE: string;
   LONGITUDE: string;
+  /** Rôle `veille` (membre de `meteo_veille`) : lit, et tient le journal. */
+  VEILLE_DATABASE_URL: string;
+  /** Identifiant SMTP du compte Brevo, et clé SMTP propre à HouseMate. */
+  SMTP_LOGIN: string;
+  SMTP_KEY: string;
+  /** Destinataire des alertes : un seul, pour l'instant. */
+  ALERT_TO: string;
+}
+
+const MAIL_FROM = "noreply@house-mate.app";
+
+async function sendMail(env: Env, mail: Mail): Promise<void> {
+  await deliver(
+    openSmtp("smtp-relay.brevo.com"),
+    { login: env.SMTP_LOGIN, key: env.SMTP_KEY },
+    { from: MAIL_FROM, to: env.ALERT_TO },
+    buildMessage({
+      from: `HouseMate <${MAIL_FROM}>`,
+      to: env.ALERT_TO,
+      subject: mail.subject,
+      text: mail.text,
+      date: new Date(),
+      messageId: `${crypto.randomUUID()}@house-mate.app`,
+    }),
+  );
+}
+
+/**
+ * La veille de gel, APRÈS la collecte de la même heure : elle décide sur le
+ * relevé et les prévisions qui viennent d'être écrits. Son échec ne touche
+ * pas la collecte, déjà faite.
+ */
+async function watchFrost(env: Env, now: Date, hour: number): Promise<void> {
+  const sql = neon(env.VEILLE_DATABASE_URL) as unknown as Sql;
+
+  if (shouldEvaluateFrost(hour)) {
+    await evaluateEvening(sql, parisDate(now), now);
+  }
+
+  if (shouldSendFrostMessage(hour)) {
+    await sendPending(sql, parisDate(now), mail => sendMail(env, mail));
+  }
+
+  if (shouldReviewNight(hour)) {
+    await reviewNight(sql, parisDate(now, -1));
+  }
 }
 
 async function collectReadings(env: Env, sql: Sql): Promise<void> {
@@ -145,7 +199,8 @@ async function collectRainForecasts(env: Env, sql: Sql): Promise<void> {
 
 export default {
   async scheduled(controller, env) {
-    const hour = parisHour(new Date(controller.scheduledTime));
+    const now = new Date(controller.scheduledTime);
+    const hour = parisHour(now);
     const sql = neon(env.DATABASE_URL) as unknown as Sql;
     const tasks: Promise<void>[] = [];
 
@@ -161,9 +216,10 @@ export default {
       tasks.push(collectRainForecasts(env, sql));
     }
 
-    // Les deux tâches vont au bout même si l'une échoue ; l'échec est ensuite
+    // Les tâches vont au bout même si l'une échoue ; l'échec est ensuite
     // relancé pour apparaître dans les journaux du Worker.
     const results = await Promise.allSettled(tasks);
+    results.push(...(await Promise.allSettled([watchFrost(env, now, hour)])));
     const failure = results.find(result => result.status === "rejected");
 
     if (failure) {

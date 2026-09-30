@@ -12,5 +12,6 @@
   "observability": { "enabled": true }
   // Toute la configuration est secrète : `wrangler secret put <NOM>` pour
   // DATABASE_URL, SWITCHBOT_TOKEN, SWITCHBOT_SECRET, SENSOR_EXTERIOR_ID,
-  // SENSOR_VERANDA_ID, LATITUDE, LONGITUDE.
+  // SENSOR_VERANDA_ID, LATITUDE, LONGITUDE ; et pour la veille de gel,
+  // VEILLE_DATABASE_URL, SMTP_LOGIN, SMTP_KEY, ALERT_TO.
 }
