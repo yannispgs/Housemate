@@ -86,6 +86,20 @@ describe("blendForecasts", () => {
     ]);
   });
 
+  it("prend la médiane du milieu quand les modèles notés sont en nombre impair", () => {
+    const blend = blendForecasts(
+      [...tonight, { source: "open-meteo", model: "ecmwf_ifs", minimum: 0 }],
+      [
+        scored("arome", 0.5),
+        scored("icon_d2", 1),
+        scored("locationforecast", 0.8),
+      ],
+    );
+
+    // Poids bruts 4, 1 et 1/0,64 = 1,5625 : la médiane, 1,5625, va à ECMWF.
+    expect(blend?.models[3]?.weight).toBeCloseTo(blend?.models[2]?.weight ?? 0);
+  });
+
   it("ne retient rien sans prévision", () => {
     expect(blendForecasts([], [])).toBeNull();
   });
@@ -173,6 +187,30 @@ describe("mailFor", () => {
 
     expect(mail.subject).toContain("chauffer");
     expect(mail.text).toContain("Pire cas retenu : −4,0 °C");
+  });
+
+  it("nomme le seul capteur muet", () => {
+    const withoutExterior = mailFor({
+      ...pending,
+      message: "indisponible",
+      exteriorAt20h: null,
+    });
+    const withoutVeranda = mailFor({
+      ...pending,
+      message: "indisponible",
+      verandaAt20h: null,
+    });
+
+    expect(withoutExterior.text).toContain("Il manque le relevé extérieur :");
+    expect(withoutVeranda.text).toContain(
+      "Il manque le relevé de la véranda :",
+    );
+  });
+
+  it("se replie sur l'impossibilité si la ligne est incomplète", () => {
+    const mail = mailFor({ ...pending, estimate: null });
+
+    expect(mail.subject).toBe("Veille de gel impossible ce soir");
   });
 
   it("dit l'impossibilité quand un relevé manquait", () => {

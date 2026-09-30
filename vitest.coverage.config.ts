@@ -21,7 +21,14 @@ export default defineConfig({
       include: ["src/lib/**/*.ts", "workers/*/src/**/*.ts"],
       // Le point d'entrée d'un Worker ne fait qu'assembler des modules testés
       // un à un ; il est vérifié par un essai réel, pas par un test unitaire.
-      exclude: ["**/*.test.ts", "workers/*/src/index.ts"],
+      // De même pour le socket SMTP : il n'existe que dans le moteur des
+      // Workers (`cloudflare:sockets`), et le dialogue qu'il transporte est
+      // testé à part (`smtp.ts`).
+      exclude: [
+        "**/*.test.ts",
+        "workers/*/src/index.ts",
+        "workers/*/src/smtp-socket.ts",
+      ],
       // Produire un rapport même si un test échoue, pour que Codecov en ait
       // toujours un.
       reportOnFailure: true,
