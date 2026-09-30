@@ -1,12 +1,13 @@
 name: Neon preview branch
 description: >-
-  Ensures a Neon branch exists, copied from `seed` (never from prod: previews
-  run unreviewed code), and is ready; or deletes it. Branches are looked up by
-  name, so every call is safe to repeat.
+  Creates a Neon branch copied from `seed` (never from prod: previews run
+  unreviewed code) and waits until it is ready; or deletes it. Branches are
+  looked up by name: creating one that exists, or deleting one that is gone,
+  does nothing but say so in the log. Every call is safe to repeat.
 
 inputs:
   operation:
-    description: "`ensure` or `delete`."
+    description: "`create` or `delete`."
     required: true
   name:
     description: Branch name, e.g. `preview/pr-14`.
@@ -20,10 +21,10 @@ inputs:
 
 outputs:
   id:
-    description: The branch id (ensure only).
+    description: The branch id, created or found (create only).
     value: ${{ steps.run.outputs.id }}
   seed-id:
-    description: The id of `seed`, its parent (ensure only).
+    description: The id of `seed`, its parent (create only).
     value: ${{ steps.run.outputs.seed-id }}
 
 runs:
@@ -38,6 +39,15 @@ runs:
         PROJECT: ${{ inputs.project }}
       run: |
         set -euo pipefail
+
+        case "$OPERATION" in
+          create|delete) ;;
+          *)
+            echo "::error::unknown operation '${OPERATION}' (create or delete)"
+            exit 1
+            ;;
+        esac
+
         api="https://console.neon.tech/api/v2/projects/${PROJECT}"
         neon() { curl -sSf -H "Authorization: Bearer ${NEON_KEY}" -H "Content-Type: application/json" "$@"; }
         branches=$(neon "${api}/branches")
@@ -45,7 +55,7 @@ runs:
 
         if [ "$OPERATION" = delete ]; then
           if [ -z "$id" ]; then
-            echo "${NAME} already absent"
+            echo "${NAME} already absent: nothing to delete"
             exit 0
           fi
 
@@ -70,7 +80,7 @@ runs:
           id=$(neon -X POST "${api}/branches" -d "$payload" | jq -r .branch.id)
           echo "Created ${NAME} (${id}) from seed"
         else
-          echo "${NAME} already exists (${id})"
+          echo "${NAME} already exists (${id}): nothing to create"
         fi
 
         # A new branch is usable once Neon reports it ready.

@@ -25,10 +25,11 @@ jobs:
 
       - uses: ./.github/actions/setup
 
+      # `seed` always exists: `create` finds it, logs so, and gives its id.
       - id: seed
         uses: ./.github/actions/neon-preview-branch
         with:
-          operation: ensure
+          operation: create
           name: seed
           api-key: ${{ secrets.NEON_API_KEY }}
           project: ${{ vars.NEON_PROJECT_ID }}

@@ -34,6 +34,10 @@ jobs:
     # Secrets are withheld from forks; this repository takes no fork PRs. The
     # release PR has no preview: Vercel skips its build (vercel.json), and a
     # database for it would only use up one of the ten Neon branches.
+    # ⚠️ This cannot move to `on.pull_request.branches`: for pull requests, that
+    # filter (negations included) matches the TARGET branch, which is `main`
+    # for the release PR as for every other. No trigger filter sees the head
+    # branch, hence this condition.
     if: >-
       github.event.pull_request.head.repo.full_name == github.repository
       && !startsWith(github.event.pull_request.head.ref, 'release-please--')
@@ -46,7 +50,7 @@ jobs:
       - id: branch
         uses: ./.github/actions/neon-preview-branch
         with:
-          operation: ensure
+          operation: create
           name: preview/pr-${{ github.event.pull_request.number }}
           api-key: ${{ secrets.NEON_API_KEY }}
           project: ${{ vars.NEON_PROJECT_ID }}
