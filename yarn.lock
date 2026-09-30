@@ -1043,7 +1043,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@playwright/test@npm:^1.61.1":
+"@playwright/test@npm:^1.63.0":
   version: 1.63.0
   resolution: "@playwright/test@npm:1.63.0"
   dependencies:
@@ -1928,7 +1928,7 @@ __metadata:
     "@biomejs/biome": "npm:2.4.16"
     "@cloudflare/workers-types": "npm:^5.20260926.1"
     "@neondatabase/serverless": "npm:^1.1.0"
-    "@playwright/test": "npm:^1.61.1"
+    "@playwright/test": "npm:^1.63.0"
     "@supabase/ssr": "npm:^0.10.3"
     "@supabase/supabase-js": "npm:^2.107.0"
     "@tailwindcss/postcss": "npm:^4.3.0"

@@ -1,0 +1,44 @@
+name: E2E (full)
+
+# Every end-to-end journey, on WebKit and Chromium. Deliberately NOT a
+# pull-request gate: it runs after each merge to main, and on demand, so it
+# never blocks a merge yet still sweeps for regressions on real code. The
+# @critical subset gates every PR in ci.yml. Public repository: the wider
+# sweep costs no Actions minutes.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+# One full run per commit on main is plenty; supersede older queued runs.
+concurrency:
+  group: e2e-full-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  e2e-full:
+    name: E2E full suite (WebKit + Chromium)
+    runs-on: ubuntu-24.04
+    # Same image as the critical journeys in ci.yml: the browsers and their
+    # system libraries come with it. ⚠️ Keep its version equal to
+    # `@playwright/test` (yarn.lock), and to the one in ci.yml.
+    container:
+      image: mcr.microsoft.com/playwright@sha256:eff16c30e6f3f4af0a03fa4b706120d5e9b0891c344a27d64559aff5900a4a27 # v1.63.0-noble
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set up Node & dependencies
+        uses: ./.github/actions/setup
+      - name: Run every journey
+        run: yarn test:e2e:full
+      - name: Upload the report
+        # Always kept: nobody watches a post-merge run live.
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: playwright-report-full
+          path: playwright-report/
+          retention-days: 14
