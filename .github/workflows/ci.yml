@@ -88,14 +88,19 @@ jobs:
       fail-fast: false
       matrix:
         browser: [webkit, chromium]
+    # Playwright's official image already carries the browsers and their system
+    # libraries: installing them on a bare runner took up to 66 s for WebKit.
+    # ⚠️ Its version must match `@playwright/test` exactly (1.63.0 in
+    # yarn.lock): bump both together, or the browsers are not found.
+    container:
+      image: mcr.microsoft.com/playwright@sha256:eff16c30e6f3f4af0a03fa4b706120d5e9b0891c344a27d64559aff5900a4a27 # v1.63.0-noble
+      # The runner's own user, as Playwright's CI guide recommends.
+      options: --user 1001
     steps:
       - name: Checkout source code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Set up Node & dependencies
         uses: ./.github/actions/setup
-      - name: Install the browser and its system libraries
-        # Playwright downloading a browser: no package is installed here.
-        run: yarn playwright install --with-deps ${{ matrix.browser }} # NOSONAR
       - name: Run the critical journeys
         run: yarn playwright test --project=${{ matrix.browser }} --grep @critical
       - name: Upload the report
