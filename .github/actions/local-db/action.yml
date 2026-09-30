@@ -28,12 +28,14 @@ runs:
       shell: bash
       run: docker compose up -d --wait --no-build
 
-    - name: Check it behaves like Neon
-      shell: bash
-      run: yarn db:verify
-
+    # Migrations first: they create the request roles the check relies on, as
+    # they must on Neon, where nothing else does.
     - name: Apply the migrations
       shell: bash
       run: yarn db:migrate
       env:
         MIGRATION_DATABASE_URL: postgres://neondb_owner@127.0.0.1:55432/neondb
+
+    - name: Check it behaves like Neon
+      shell: bash
+      run: yarn db:verify
