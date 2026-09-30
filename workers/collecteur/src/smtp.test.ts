@@ -150,6 +150,21 @@ describe("buildMessage", () => {
     );
   });
 
+  it("accepte un corps vide et une adresse sans nom", () => {
+    const empty = buildMessage({
+      from: "noreply@house-mate.app",
+      to: "d@e.f",
+      subject: "s",
+      text: "",
+      date: new Date(0),
+      messageId: "m",
+    });
+
+    expect(empty).toContain("From: noreply@house-mate.app\r\n");
+    // En-têtes, puis la ligne vide qui les sépare d'un corps vide.
+    expect(empty.endsWith("Content-Transfer-Encoding: base64\r\n")).toBe(true);
+  });
+
   it("coupe le corps en lignes de 76 caractères au plus", () => {
     const long = buildMessage({
       from: "a@b.c",

@@ -90,9 +90,11 @@ function median(values: readonly number[]): number {
   const middle = Math.floor(sorted.length / 2);
 
   if (sorted.length % 2 === 1) {
+    /* c8 ignore next -- repli inatteignable : `middle` est un indice valide. */
     return sorted[middle] ?? 0;
   }
 
+  /* c8 ignore next -- replis inatteignables : deux indices valides. */
   return ((sorted[middle - 1] ?? 0) + (sorted[middle] ?? 0)) / 2;
 }
 
@@ -148,6 +150,7 @@ export function blendForecasts(
   const total = raw.reduce((sum, weight) => sum + weight, 0);
   const models = minima.map((entry, index) => ({
     ...entry,
+    /* c8 ignore next -- repli inatteignable : un poids par modèle. */
     weight: (raw[index] ?? 0) / total,
   }));
   const minimum = models.reduce(
