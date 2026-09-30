@@ -1,35 +1,38 @@
 import type { Metadata, Viewport } from "next";
-import { Caprasimo, Figtree } from "next/font/google";
+import localFont from "next/font/local";
 import type { ReactNode } from "react";
 import { AppShell } from "@/components/app-shell";
 import "./globals.css";
 
 /*
- * Polices auto-hébergées, PAS le CDN Google.
- *
- * `next/font/google` télécharge les fichiers au moment du BUILD et les sert
- * depuis notre propre domaine. Aucune requête vers Google au runtime.
+ * Polices servies par l'app elle-même, depuis app/fonts/.
  *
  * ⚠️ Deux raisons, et la première est une exigence du produit :
- * 1. Le § 13 promet que consultation et complétion marchent hors-ligne. Un
- *    `@import url(fonts.googleapis.com)` se résout au runtime — dans la cave
- *    ou le garage, la police tombe en repli et toute la mise en page bouge.
- * 2. Le CDN reçoit l'IP de chaque membre du foyer à chaque chargement, ce que
- *    le § 7 cherche précisément à éviter.
+ * 1. Le § 13 promet que consultation et complétion marchent hors-ligne. Une
+ *    police chargée depuis un CDN au runtime tomberait en repli dans la cave
+ *    ou le garage, et toute la mise en page bougerait.
+ * 2. Un CDN recevrait l'IP de chaque membre du foyer à chaque chargement, ce
+ *    que le § 7 cherche précisément à éviter.
  *
- * Caprasimo et Figtree sont sous SIL Open Font License : l'hébergement et la
- * redistribution sont permis.
+ * Fichiers dans le dépôt plutôt que `next/font/google` : celui-ci télécharge
+ * les polices chez Google à chaque BUILD, et un téléchargement raté faisait
+ * échouer la CI au hasard. Sous-ensemble latin (français compris : é, ç, œ,
+ * «», €), tel que Google le sert.
+ *
+ * Caprasimo et Figtree sont sous SIL Open Font License : redistribution
+ * permise, licences à côté des fichiers (app/fonts/OFL-*.txt).
  */
-const caprasimo = Caprasimo({
-  subsets: ["latin"],
+const caprasimo = localFont({
+  src: "./fonts/caprasimo-latin.woff2",
   weight: "400",
   variable: "--font-heading-loaded",
   display: "swap",
 });
 
-const figtree = Figtree({
-  subsets: ["latin"],
-  weight: ["400", "600", "700"],
+// Police variable : un seul fichier couvre les graisses 400 à 700.
+const figtree = localFont({
+  src: "./fonts/figtree-latin.woff2",
+  weight: "400 700",
   variable: "--font-body-loaded",
   display: "swap",
 });
